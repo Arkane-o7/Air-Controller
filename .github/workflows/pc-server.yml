@@ -1,5 +1,8 @@
 name: PC Server
 
+permissions:
+  contents: write
+
 on:
   push:
     paths:
@@ -16,6 +19,12 @@ on:
       - "scripts/sync_data_exchange.sh"
       - ".github/workflows/pc-server.yml"
   workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release tag to upload ZIP assets to (e.g. v0.1.0). Leave empty to skip release upload."
+        required: false
+        default: ""
+        type: string
 
 jobs:
   build:
@@ -83,3 +92,19 @@ jobs:
         with:
           name: pc-server-windows-zip
           path: Virtual-GamePad-Windows.zip
+
+      - name: Upload Linux ZIP to release
+        if: runner.os == 'Linux' && github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag }}
+          files: Virtual-GamePad-Ubuntu.zip
+          fail_on_unmatched_files: true
+
+      - name: Upload Windows ZIP to release
+        if: runner.os == 'Windows' && github.event_name == 'workflow_dispatch' && github.event.inputs.release_tag != ''
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.release_tag }}
+          files: Virtual-GamePad-Windows.zip
+          fail_on_unmatched_files: true
