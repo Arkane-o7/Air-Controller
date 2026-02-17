@@ -137,7 +137,7 @@ fun ConnectMenu(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
-    val downloadsUrl = "https://kitswas.github.io/VirtualGamePad/#installation"
+    val downloadsUrl = "https://arkane-o7.github.io/Air-Controller/"
 
     val qrCodeScanner = rememberQRCodeScanner { result ->
         processQRScanResult(
