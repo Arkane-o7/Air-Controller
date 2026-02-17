@@ -1,0 +1,340 @@
+{
+  "defaults": {
+    "gameProfileId": "platformer",
+    "layoutId": "balanced"
+  },
+  "gameProfiles": [
+    {
+      "id": "platformer",
+      "name": "Platformer",
+      "description": "Classic side-scroller layout with jump, action, and shoulder assists.",
+      "keyboardMap": {
+        "up": "up",
+        "down": "down",
+        "left": "left",
+        "right": "right",
+        "a": "space",
+        "b": "left_shift",
+        "x": "z",
+        "y": "x",
+        "lb": "q",
+        "rb": "e",
+        "lt": "left_control",
+        "rt": "left_alt",
+        "start": "enter",
+        "select": "escape",
+        "ls": "c",
+        "rs": "v"
+      },
+      "virtualMap": {
+        "up": [
+          "dpad_up"
+        ],
+        "down": [
+          "dpad_down"
+        ],
+        "left": [
+          "dpad_left"
+        ],
+        "right": [
+          "dpad_right"
+        ],
+        "a": [
+          "south"
+        ],
+        "b": [
+          "east"
+        ],
+        "x": [
+          "west"
+        ],
+        "y": [
+          "north"
+        ],
+        "lb": [
+          "lb"
+        ],
+        "rb": [
+          "rb"
+        ],
+        "lt": [
+          "lt"
+        ],
+        "rt": [
+          "rt"
+        ],
+        "start": [
+          "start"
+        ],
+        "select": [
+          "back"
+        ],
+        "ls": [
+          "ls"
+        ],
+        "rs": [
+          "rs"
+        ]
+      }
+    },
+    {
+      "id": "racing",
+      "name": "Racing",
+      "description": "Throttle and brake on triggers with face-button utility actions.",
+      "keyboardMap": {
+        "up": "up",
+        "down": "down",
+        "left": "left",
+        "right": "right",
+        "a": "up",
+        "b": "down",
+        "x": "space",
+        "y": "r",
+        "lb": "q",
+        "rb": "e",
+        "lt": "left_shift",
+        "rt": "left_control",
+        "start": "enter",
+        "select": "escape",
+        "ls": "c",
+        "rs": "v"
+      },
+      "virtualMap": {
+        "up": [
+          "dpad_up"
+        ],
+        "down": [
+          "dpad_down"
+        ],
+        "left": [
+          "dpad_left"
+        ],
+        "right": [
+          "dpad_right"
+        ],
+        "a": [
+          "rt"
+        ],
+        "b": [
+          "lt"
+        ],
+        "x": [
+          "south"
+        ],
+        "y": [
+          "north"
+        ],
+        "lb": [
+          "lb"
+        ],
+        "rb": [
+          "rb"
+        ],
+        "lt": [
+          "lt"
+        ],
+        "rt": [
+          "rt"
+        ],
+        "start": [
+          "start"
+        ],
+        "select": [
+          "back"
+        ],
+        "ls": [
+          "ls"
+        ],
+        "rs": [
+          "rs"
+        ]
+      }
+    },
+    {
+      "id": "arena",
+      "name": "Arena Shooter",
+      "description": "WASD style movement with bumpers/triggers for combat actions.",
+      "keyboardMap": {
+        "up": "w",
+        "down": "s",
+        "left": "a",
+        "right": "d",
+        "a": "space",
+        "b": "left_control",
+        "x": "r",
+        "y": "f",
+        "lb": "q",
+        "rb": "e",
+        "lt": "left_shift",
+        "rt": "left_alt",
+        "start": "enter",
+        "select": "escape",
+        "ls": "c",
+        "rs": "v"
+      },
+      "virtualMap": {
+        "up": [
+          "dpad_up"
+        ],
+        "down": [
+          "dpad_down"
+        ],
+        "left": [
+          "dpad_left"
+        ],
+        "right": [
+          "dpad_right"
+        ],
+        "a": [
+          "south"
+        ],
+        "b": [
+          "east"
+        ],
+        "x": [
+          "west"
+        ],
+        "y": [
+          "north"
+        ],
+        "lb": [
+          "lb"
+        ],
+        "rb": [
+          "rb"
+        ],
+        "lt": [
+          "lt"
+        ],
+        "rt": [
+          "rt"
+        ],
+        "start": [
+          "start"
+        ],
+        "select": [
+          "back"
+        ],
+        "ls": [
+          "ls"
+        ],
+        "rs": [
+          "rs"
+        ]
+      }
+    }
+  ],
+  "layouts": [
+    {
+      "id": "balanced",
+      "name": "Balanced",
+      "description": "Classic split with left movement and right action clusters.",
+      "panelOrder": [
+        "stick",
+        "action"
+      ],
+      "buttonGrid": [
+        "x",
+        "y",
+        "a",
+        "b"
+      ],
+      "buttonLabels": {
+        "a": "A",
+        "b": "B",
+        "x": "X",
+        "y": "Y"
+      },
+      "dpadLabels": {
+        "up": "UP",
+        "down": "DN",
+        "left": "LT",
+        "right": "RT"
+      },
+      "utilityLabels": {
+        "lb": "LB",
+        "rb": "RB",
+        "lt": "LT",
+        "rt": "RT",
+        "start": "START",
+        "select": "SELECT",
+        "ls": "L3",
+        "rs": "R3"
+      }
+    },
+    {
+      "id": "southpaw",
+      "name": "Southpaw",
+      "description": "Action panel appears first and movement shifts to the second column.",
+      "panelOrder": [
+        "action",
+        "stick"
+      ],
+      "buttonGrid": [
+        "y",
+        "x",
+        "b",
+        "a"
+      ],
+      "buttonLabels": {
+        "a": "A",
+        "b": "B",
+        "x": "X",
+        "y": "Y"
+      },
+      "dpadLabels": {
+        "up": "UP",
+        "down": "DN",
+        "left": "LT",
+        "right": "RT"
+      },
+      "utilityLabels": {
+        "lb": "LB",
+        "rb": "RB",
+        "lt": "LT",
+        "rt": "RT",
+        "start": "START",
+        "select": "SELECT",
+        "ls": "L3",
+        "rs": "R3"
+      }
+    },
+    {
+      "id": "racer",
+      "name": "Racer",
+      "description": "Driving-centric labels with prominent gas and brake cues.",
+      "panelOrder": [
+        "stick",
+        "action"
+      ],
+      "buttonGrid": [
+        "y",
+        "x",
+        "a",
+        "b"
+      ],
+      "buttonLabels": {
+        "a": "GO",
+        "b": "BRK",
+        "x": "CAM",
+        "y": "NOS"
+      },
+      "dpadLabels": {
+        "up": "UP",
+        "down": "DN",
+        "left": "L",
+        "right": "R"
+      },
+      "utilityLabels": {
+        "lb": "LOOK",
+        "rb": "SHIFT",
+        "lt": "BRAKE",
+        "rt": "GAS",
+        "start": "START",
+        "select": "SELECT",
+        "ls": "L3",
+        "rs": "R3"
+      }
+    }
+  ]
+}

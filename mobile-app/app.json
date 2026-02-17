@@ -1,0 +1,25 @@
+{
+  "expo": {
+    "name": "AIR Controller",
+    "slug": "air-controller-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "dark",
+    "splash": {
+      "resizeMode": "contain",
+      "backgroundColor": "#050b13"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "package": "com.aircontroller.mobile"
+    },
+    "web": {
+      "bundler": "metro"
+    }
+  }
+}

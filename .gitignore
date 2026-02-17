@@ -1,0 +1,11 @@
+node_modules/
+.air-bridge-venv/
+*.log
+.DS_Store
+desktop-app/dist/
+desktop-app/node_modules/
+mobile-app/node_modules/
+mobile-app/.expo/
+mobile-app/.expo-shared/
+mobile-app/android/
+mobile-app/ios/

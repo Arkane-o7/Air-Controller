@@ -1,0 +1,50 @@
+{
+  "name": "air-controller-desktop",
+  "version": "0.1.0",
+  "description": "AIR Controller desktop app",
+  "main": "main.js",
+  "author": "",
+  "license": "MIT",
+  "scripts": {
+    "dev": "electron .",
+    "dist": "electron-builder",
+    "build:win": "electron-builder --win nsis",
+    "build:linux": "electron-builder --linux AppImage deb"
+  },
+  "dependencies": {
+    "@nut-tree-fork/nut-js": "^4.2.6",
+    "express": "^4.19.2",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.3"
+  },
+  "devDependencies": {
+    "electron": "^31.6.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.aircontroller.desktop",
+    "productName": "AIR Controller",
+    "directories": {
+      "buildResources": "build",
+      "output": "dist"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "src/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Game"
+    }
+  }
+}

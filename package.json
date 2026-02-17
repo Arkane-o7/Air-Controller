@@ -1,0 +1,35 @@
+{
+  "name": "air-controller",
+  "version": "0.1.0",
+  "description": "Use a phone as a game controller for another device over local network",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js",
+    "bridge": "node bridge/keyboard-bridge.js",
+    "bridge:keyboard": "node bridge/keyboard-bridge.js",
+    "bridge:virtual": "node bridge/run-virtual-bridge.js",
+    "bridge:install": "node bridge/run-virtual-bridge.js --setup-only",
+    "desktop:dev": "npm --prefix desktop-app run dev",
+    "desktop:build:win": "npm --prefix desktop-app run build:win",
+    "desktop:build:linux": "npm --prefix desktop-app run build:linux",
+    "mobile:dev": "npm --prefix mobile-app run start",
+    "mobile:android": "npm --prefix mobile-app run android",
+    "mobile:ios": "npm --prefix mobile-app run ios",
+    "mobile:build:android": "npm --prefix mobile-app run build:android",
+    "mobile:build:ios": "npm --prefix mobile-app run build:ios"
+  },
+  "keywords": [
+    "controller",
+    "socket.io",
+    "gamepad",
+    "mobile"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "@nut-tree-fork/nut-js": "^4.2.6",
+    "express": "^4.19.2",
+    "socket.io-client": "^4.8.3",
+    "socket.io": "^4.8.1"
+  }
+}

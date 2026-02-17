@@ -1,0 +1,1077 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AIR Controller | Host</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --bg-0: #060c14;
+        --bg-1: #11263f;
+        --panel: rgba(8, 20, 37, 0.82);
+        --trace: #1ce2b5;
+        --warn: #ff8e2b;
+        --text: #f2f8ff;
+      }
+
+      * { box-sizing: border-box; }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        color: var(--text);
+        font-family: "IBM Plex Sans", sans-serif;
+        background:
+          radial-gradient(circle at 82% 4%, rgba(28, 226, 181, 0.14), transparent 32%),
+          radial-gradient(circle at 12% 96%, rgba(255, 142, 43, 0.2), transparent 38%),
+          linear-gradient(160deg, var(--bg-0), #081729 55%, var(--bg-1));
+        display: grid;
+        place-items: center;
+        padding: 1.2rem;
+      }
+
+      .shell {
+        width: min(1240px, 100%);
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        border-radius: 24px;
+        overflow: hidden;
+        backdrop-filter: blur(9px);
+        background: linear-gradient(170deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.015));
+        box-shadow: 0 28px 85px rgba(0, 0, 0, 0.45);
+      }
+
+      header {
+        padding: 1rem 1.3rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+      }
+
+      .brand {
+        font-family: "Bebas Neue", cursive;
+        letter-spacing: 0.08em;
+        font-size: 1.9rem;
+      }
+
+      .status {
+        padding: 0.4rem 0.75rem;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        font-weight: 700;
+        font-size: 0.8rem;
+      }
+
+      .status.connected {
+        color: #022117;
+        border: none;
+        background: linear-gradient(90deg, #4ef3d0, #b8ffe8);
+      }
+
+      main {
+        padding: 1.2rem;
+        display: grid;
+        gap: 1rem;
+        grid-template-columns: 1.45fr 1fr;
+      }
+
+      .panel {
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        background: var(--panel);
+        border-radius: 18px;
+        padding: 0.9rem;
+      }
+
+      h2 {
+        margin: 0 0 0.7rem;
+        font-family: "Bebas Neue", cursive;
+        font-size: 1.5rem;
+        letter-spacing: 0.05em;
+        font-weight: 400;
+      }
+
+      .row {
+        display: flex;
+        gap: 0.7rem;
+        flex-wrap: wrap;
+        align-items: center;
+      }
+
+      .field {
+        display: grid;
+        gap: 0.3rem;
+        flex: 1;
+        min-width: 200px;
+      }
+
+      .field span {
+        font-size: 0.75rem;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        opacity: 0.86;
+      }
+
+      select,
+      input,
+      textarea,
+      button {
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.24);
+        background: rgba(255, 255, 255, 0.06);
+        color: var(--text);
+        padding: 0.58rem 0.65rem;
+        font-size: 0.9rem;
+        font-family: inherit;
+      }
+
+      textarea {
+        min-height: 74px;
+        resize: vertical;
+      }
+
+      button {
+        border: none;
+        cursor: pointer;
+        color: #02130f;
+        background: linear-gradient(110deg, var(--trace), #b6fceb);
+        font-weight: 700;
+      }
+
+      button.warn {
+        color: #311500;
+        background: linear-gradient(110deg, var(--warn), #ffc48c);
+      }
+
+      button.subtle {
+        color: var(--text);
+        border: 1px solid rgba(255, 255, 255, 0.24);
+        background: rgba(255, 255, 255, 0.08);
+      }
+
+      .code {
+        font-size: clamp(1.6rem, 3vw, 2.4rem);
+        font-family: "Bebas Neue", cursive;
+        letter-spacing: 0.22em;
+        padding: 0.28rem 0.7rem;
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.26);
+        background: rgba(255, 255, 255, 0.05);
+      }
+
+      .url {
+        margin-top: 0.7rem;
+        padding: 0.65rem 0.75rem;
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        font-size: 0.84rem;
+        word-break: break-all;
+      }
+
+      #qrcode {
+        display: grid;
+        place-items: center;
+        margin-top: 0.65rem;
+        padding: 0.7rem;
+        border-radius: 12px;
+        background: #f9fdff;
+        width: fit-content;
+      }
+
+      .meta {
+        margin-top: 0.42rem;
+        font-size: 0.83rem;
+        opacity: 0.88;
+      }
+
+      .bridge-command {
+        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+        font-size: 0.76rem;
+        margin-top: 0.3rem;
+        padding: 0.5rem 0.55rem;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.04);
+        word-break: break-all;
+      }
+
+      .bridge-note {
+        margin-top: 0.5rem;
+        font-size: 0.74rem;
+        opacity: 0.87;
+      }
+
+      .live-grid {
+        display: grid;
+        gap: 0.5rem;
+        grid-template-columns: repeat(4, minmax(70px, 1fr));
+      }
+
+      .key {
+        border-radius: 10px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        min-height: 48px;
+        display: grid;
+        place-items: center;
+        font-family: "Bebas Neue", cursive;
+        font-size: 1.1rem;
+        letter-spacing: 0.08em;
+        transition: transform 80ms ease, border-color 100ms ease, background 100ms ease;
+      }
+
+      .key.active {
+        transform: translateY(-1px);
+        border-color: rgba(78, 243, 208, 0.95);
+        background: linear-gradient(140deg, rgba(78, 243, 208, 0.24), rgba(78, 243, 208, 0.1));
+      }
+
+      .sticks {
+        display: flex;
+        gap: 0.9rem;
+        flex-wrap: wrap;
+        margin-top: 0.6rem;
+      }
+
+      .stick {
+        width: 165px;
+        height: 165px;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: radial-gradient(circle at center, rgba(78, 243, 208, 0.1), rgba(10, 22, 36, 0.65));
+        position: relative;
+      }
+
+      .stick::after {
+        content: attr(data-label);
+        position: absolute;
+        bottom: 8px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 0.72rem;
+        letter-spacing: 0.04em;
+        opacity: 0.75;
+      }
+
+      .stick-dot {
+        width: 28px;
+        height: 28px;
+        border-radius: 999px;
+        background: linear-gradient(150deg, #4ef3d0, #c6fff0);
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        box-shadow: 0 0 22px rgba(78, 243, 208, 0.42);
+        transition: transform 35ms linear;
+      }
+
+      .log {
+        margin: 0.45rem 0 0;
+        padding-left: 1rem;
+        font-size: 0.82rem;
+        max-height: 240px;
+        overflow: auto;
+      }
+
+      .log li { margin-bottom: 0.3rem; }
+
+      .editor-toggle {
+        margin-top: 0.55rem;
+      }
+
+      .editor {
+        margin-top: 0.75rem;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 14px;
+        padding: 0.8rem;
+        background: rgba(255, 255, 255, 0.03);
+        display: none;
+      }
+
+      .editor.open {
+        display: block;
+      }
+
+      .editor-grid {
+        display: grid;
+        gap: 0.55rem;
+        grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+      }
+
+      .mapping-table {
+        margin-top: 0.6rem;
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.82rem;
+      }
+
+      .mapping-table th,
+      .mapping-table td {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+        padding: 0.42rem;
+        text-align: left;
+      }
+
+      .mapping-table th {
+        font-size: 0.73rem;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        opacity: 0.82;
+      }
+
+      .mapping-table select {
+        width: 100%;
+        min-width: 130px;
+        padding: 0.44rem 0.48rem;
+        font-size: 0.8rem;
+      }
+
+      .editor-actions {
+        margin-top: 0.62rem;
+      }
+
+      .editor-status {
+        margin-top: 0.45rem;
+        font-size: 0.8rem;
+        opacity: 0.9;
+      }
+
+      @media (max-width: 1020px) {
+        main { grid-template-columns: 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <header>
+        <div class="brand">AIR CONTROLLER / HOST</div>
+        <div id="status" class="status">WAITING</div>
+      </header>
+      <main>
+        <section class="panel">
+          <h2>Session + Profiles</h2>
+          <div class="row">
+            <label class="field">
+              <span>Game Mapping</span>
+              <select id="gameProfileSelect"></select>
+            </label>
+            <label class="field">
+              <span>Controller Layout</span>
+              <select id="layoutSelect"></select>
+            </label>
+            <label class="field">
+              <span>Virtual Device</span>
+              <select id="virtualDeviceSelect">
+                <option value="xbox">Xbox 360</option>
+                <option value="ds4">DualShock 4</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="row" style="margin-top: 0.6rem">
+            <div id="sessionCode" class="code">------</div>
+            <button id="copyBtn" type="button">Copy Link</button>
+            <button id="resetBtn" type="button" class="warn">New Session</button>
+          </div>
+
+          <div id="joinUrl" class="url">Generating...</div>
+          <div id="qrcode"></div>
+
+          <div class="meta" id="configMeta">Mapping: -- | Layout: --</div>
+          <div class="meta" id="connectedCount">Controllers connected: 0</div>
+          <div class="meta" id="bridgeCount">Bridges connected: 0</div>
+
+          <div class="bridge-note">One-click virtual bridge setup:</div>
+          <div class="bridge-command" id="bridgeSetupCommand">npm run bridge:install</div>
+
+          <div class="bridge-note">Run virtual gamepad bridge (Windows/Linux):</div>
+          <div class="bridge-command" id="bridgeCommand">npm run bridge:virtual -- --server http://localhost:3000 --code ------ --device xbox</div>
+
+          <div class="bridge-note">Keyboard bridge fallback:</div>
+          <div class="bridge-command" id="keyboardBridgeCommand">npm run bridge -- --server http://localhost:3000 --code ------</div>
+
+          <button id="profileEditorToggle" type="button" class="subtle editor-toggle">Open Profile Editor</button>
+
+          <section id="profileEditorPanel" class="editor" aria-hidden="true">
+            <h2 style="font-size: 1.28rem">Profile Editor</h2>
+            <div class="editor-grid">
+              <label class="field">
+                <span>Edit Profile</span>
+                <select id="editProfileSelect"></select>
+              </label>
+              <label class="field">
+                <span>Profile ID</span>
+                <input id="editProfileId" maxlength="42" placeholder="custom_profile" />
+              </label>
+              <label class="field">
+                <span>Profile Name</span>
+                <input id="editProfileName" maxlength="60" placeholder="Custom Profile" />
+              </label>
+            </div>
+            <label class="field" style="margin-top: 0.5rem">
+              <span>Description</span>
+              <textarea id="editProfileDescription" placeholder="Describe mapping behavior"></textarea>
+            </label>
+
+            <table class="mapping-table">
+              <thead>
+                <tr>
+                  <th>Input</th>
+                  <th>Keyboard</th>
+                  <th>Virtual Action</th>
+                </tr>
+              </thead>
+              <tbody id="mappingRows"></tbody>
+            </table>
+
+            <div class="row editor-actions">
+              <button id="saveProfileBtn" type="button">Save</button>
+              <button id="saveAsNewBtn" type="button" class="subtle">Save As New</button>
+              <button id="deleteProfileBtn" type="button" class="warn">Delete</button>
+              <button id="reloadProfilesBtn" type="button" class="subtle">Reload</button>
+            </div>
+            <div id="editorStatus" class="editor-status">Ready.</div>
+          </section>
+        </section>
+
+        <section class="panel">
+          <h2>Live Input</h2>
+          <div class="live-grid" id="liveGrid">
+            <div class="key" data-key="up">UP</div>
+            <div class="key" data-key="x">X</div>
+            <div class="key" data-key="lb">LB</div>
+            <div class="key" data-key="start">START</div>
+            <div class="key" data-key="left">LEFT</div>
+            <div class="key" data-key="a">A</div>
+            <div class="key" data-key="lt">LT</div>
+            <div class="key" data-key="select">SELECT</div>
+            <div class="key" data-key="down">DOWN</div>
+            <div class="key" data-key="b">B</div>
+            <div class="key" data-key="rb">RB</div>
+            <div class="key" data-key="ls">L3</div>
+            <div class="key" data-key="right">RIGHT</div>
+            <div class="key" data-key="y">Y</div>
+            <div class="key" data-key="rt">RT</div>
+            <div class="key" data-key="rs">R3</div>
+          </div>
+
+          <div class="sticks">
+            <div class="stick" data-label="LEFT STICK"><div id="leftStickDot" class="stick-dot"></div></div>
+            <div class="stick" data-label="RIGHT STICK"><div id="rightStickDot" class="stick-dot"></div></div>
+          </div>
+
+          <div class="meta" id="latency">Last update: --</div>
+          <ul id="log" class="log"></ul>
+        </section>
+      </main>
+    </div>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
+    <script>
+      const socket = io();
+
+      const statusEl = document.getElementById("status");
+      const codeEl = document.getElementById("sessionCode");
+      const urlEl = document.getElementById("joinUrl");
+      const qrcodeEl = document.getElementById("qrcode");
+      const logEl = document.getElementById("log");
+      const latencyEl = document.getElementById("latency");
+      const connectedCountEl = document.getElementById("connectedCount");
+      const bridgeCountEl = document.getElementById("bridgeCount");
+      const configMetaEl = document.getElementById("configMeta");
+      const gameProfileSelect = document.getElementById("gameProfileSelect");
+      const layoutSelect = document.getElementById("layoutSelect");
+      const virtualDeviceSelect = document.getElementById("virtualDeviceSelect");
+      const bridgeSetupCommandEl = document.getElementById("bridgeSetupCommand");
+      const bridgeCommandEl = document.getElementById("bridgeCommand");
+      const keyboardBridgeCommandEl = document.getElementById("keyboardBridgeCommand");
+      const leftStickDot = document.getElementById("leftStickDot");
+      const rightStickDot = document.getElementById("rightStickDot");
+
+      const profileEditorToggle = document.getElementById("profileEditorToggle");
+      const profileEditorPanel = document.getElementById("profileEditorPanel");
+      const editProfileSelect = document.getElementById("editProfileSelect");
+      const editProfileId = document.getElementById("editProfileId");
+      const editProfileName = document.getElementById("editProfileName");
+      const editProfileDescription = document.getElementById("editProfileDescription");
+      const mappingRowsEl = document.getElementById("mappingRows");
+      const editorStatusEl = document.getElementById("editorStatus");
+
+      const keys = Array.from(document.querySelectorAll(".key"));
+
+      let sessionCode = "";
+      let connectedControllers = 0;
+      let connectedBridges = 0;
+      let creatingSession = false;
+      let editorOpen = false;
+
+      let catalogPayload = null;
+      let currentConfig = {
+        gameProfileId: "",
+        layoutId: "",
+      };
+
+      const rowControls = new Map();
+
+      function setEditorStatus(message) {
+        editorStatusEl.textContent = message;
+      }
+
+      function appendLog(message) {
+        const li = document.createElement("li");
+        const time = new Date().toLocaleTimeString();
+        li.textContent = `[${time}] ${message}`;
+        logEl.prepend(li);
+
+        while (logEl.children.length > 14) {
+          logEl.removeChild(logEl.lastChild);
+        }
+      }
+
+      function setStatus(connected) {
+        statusEl.textContent = connected ? "CONNECTED" : "WAITING";
+        statusEl.classList.toggle("connected", connected);
+      }
+
+      function setConnectedCount(count) {
+        connectedControllers = count;
+        connectedCountEl.textContent = `Controllers connected: ${count}`;
+        setStatus(count > 0);
+      }
+
+      function setBridgeCount(count) {
+        connectedBridges = count;
+        bridgeCountEl.textContent = `Bridges connected: ${count}`;
+      }
+
+      function getCatalog() {
+        return catalogPayload?.catalog || null;
+      }
+
+      function getEditorOptions() {
+        return catalogPayload?.options || null;
+      }
+
+      function getGameProfileName(id) {
+        const profiles = getCatalog()?.gameProfiles || [];
+        const match = profiles.find((profile) => profile.id === id);
+        return match ? match.name : id || "--";
+      }
+
+      function getLayoutName(id) {
+        const layouts = getCatalog()?.layouts || [];
+        const match = layouts.find((layout) => layout.id === id);
+        return match ? match.name : id || "--";
+      }
+
+      function renderConfigMeta() {
+        configMetaEl.textContent = `Mapping: ${getGameProfileName(currentConfig.gameProfileId)} | Layout: ${getLayoutName(currentConfig.layoutId)}`;
+      }
+
+      function updateBridgeCommand() {
+        const code = sessionCode || "------";
+        const virtualDevice = virtualDeviceSelect.value || "xbox";
+        bridgeSetupCommandEl.textContent = "npm run bridge:install";
+        bridgeCommandEl.textContent = `npm run bridge:virtual -- --server ${window.location.origin} --code ${code} --device ${virtualDevice}`;
+        keyboardBridgeCommandEl.textContent = `npm run bridge -- --server ${window.location.origin} --code ${code}`;
+      }
+
+      function syncConfigSelects() {
+        if (currentConfig.gameProfileId) {
+          gameProfileSelect.value = currentConfig.gameProfileId;
+        }
+
+        if (currentConfig.layoutId) {
+          layoutSelect.value = currentConfig.layoutId;
+        }
+      }
+
+      function setCode(code) {
+        sessionCode = code;
+        codeEl.textContent = code;
+
+        const joinUrl = `${window.location.origin}/controller?code=${encodeURIComponent(code)}`;
+        urlEl.textContent = joinUrl;
+
+        qrcodeEl.innerHTML = "";
+        QRCode.toCanvas(joinUrl, { width: 170, margin: 1 }, (err, canvas) => {
+          if (!err) {
+            qrcodeEl.appendChild(canvas);
+          }
+        });
+
+        updateBridgeCommand();
+      }
+
+      function moveStickDot(node, stick) {
+        const x = Math.max(-1, Math.min(1, Number(stick?.x || 0))) * 54;
+        const y = Math.max(-1, Math.min(1, Number(stick?.y || 0))) * 54;
+        node.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
+      }
+
+      function applyInput(payload) {
+        const buttons = payload.buttons || {};
+
+        keys.forEach((node) => {
+          const key = node.dataset.key;
+          node.classList.toggle("active", Boolean(buttons[key]));
+        });
+
+        const leftStick = payload.leftStick || payload.stick || { x: 0, y: 0 };
+        const rightStick = payload.rightStick || { x: 0, y: 0 };
+
+        moveStickDot(leftStickDot, leftStick);
+        moveStickDot(rightStickDot, rightStick);
+      }
+
+      function selectedConfig() {
+        return {
+          gameProfileId: gameProfileSelect.value,
+          layoutId: layoutSelect.value,
+        };
+      }
+
+      function populateSessionSelects() {
+        const catalog = getCatalog();
+
+        if (!catalog) {
+          return;
+        }
+
+        gameProfileSelect.innerHTML = "";
+        layoutSelect.innerHTML = "";
+
+        catalog.gameProfiles.forEach((profile) => {
+          const option = document.createElement("option");
+          option.value = profile.id;
+          option.textContent = `${profile.name} - ${profile.description}`;
+          gameProfileSelect.appendChild(option);
+        });
+
+        catalog.layouts.forEach((layout) => {
+          const option = document.createElement("option");
+          option.value = layout.id;
+          option.textContent = `${layout.name} - ${layout.description}`;
+          layoutSelect.appendChild(option);
+        });
+
+        const hasCurrentProfile = catalog.gameProfiles.some((profile) => profile.id === currentConfig.gameProfileId);
+        if (!currentConfig.gameProfileId || !hasCurrentProfile) {
+          currentConfig.gameProfileId = catalog.defaults.gameProfileId;
+        }
+
+        const hasCurrentLayout = catalog.layouts.some((layout) => layout.id === currentConfig.layoutId);
+        if (!currentConfig.layoutId || !hasCurrentLayout) {
+          currentConfig.layoutId = catalog.defaults.layoutId;
+        }
+
+        syncConfigSelects();
+        renderConfigMeta();
+      }
+
+      function buildSelectOptions(selectNode, options, selectedValue) {
+        selectNode.innerHTML = "";
+
+        const values = [...options];
+        if (selectedValue && !values.includes(selectedValue)) {
+          values.push(selectedValue);
+        }
+
+        values.forEach((value) => {
+          const option = document.createElement("option");
+          option.value = value;
+          option.textContent = value || "-- none --";
+          selectNode.appendChild(option);
+        });
+
+        selectNode.value = selectedValue || "";
+      }
+
+      function renderMappingRows(profile) {
+        const options = getEditorOptions();
+
+        if (!options) {
+          return;
+        }
+
+        mappingRowsEl.innerHTML = "";
+        rowControls.clear();
+
+        options.inputs.forEach((entry) => {
+          const tr = document.createElement("tr");
+
+          const labelTd = document.createElement("td");
+          labelTd.textContent = entry.label;
+
+          const keyboardTd = document.createElement("td");
+          const keyboardSelect = document.createElement("select");
+          const keyboardValue = Array.isArray(profile.keyboardMap?.[entry.id])
+            ? profile.keyboardMap[entry.id][0] || ""
+            : profile.keyboardMap?.[entry.id] || "";
+          buildSelectOptions(keyboardSelect, options.keyboardTokens, keyboardValue);
+          keyboardTd.appendChild(keyboardSelect);
+
+          const virtualTd = document.createElement("td");
+          const virtualSelect = document.createElement("select");
+          const virtualValue = Array.isArray(profile.virtualMap?.[entry.id])
+            ? profile.virtualMap[entry.id][0] || ""
+            : profile.virtualMap?.[entry.id] || "";
+          buildSelectOptions(virtualSelect, options.virtualActions, virtualValue);
+          virtualTd.appendChild(virtualSelect);
+
+          tr.appendChild(labelTd);
+          tr.appendChild(keyboardTd);
+          tr.appendChild(virtualTd);
+          mappingRowsEl.appendChild(tr);
+
+          rowControls.set(entry.id, {
+            keyboardSelect,
+            virtualSelect,
+          });
+        });
+      }
+
+      function getProfileById(profileId) {
+        return getCatalog()?.gameProfiles?.find((profile) => profile.id === profileId) || null;
+      }
+
+      function populateEditorProfileSelect() {
+        const catalog = getCatalog();
+
+        if (!catalog) {
+          return;
+        }
+
+        editProfileSelect.innerHTML = "";
+        catalog.gameProfiles.forEach((profile) => {
+          const option = document.createElement("option");
+          option.value = profile.id;
+          option.textContent = `${profile.name} (${profile.id})`;
+          editProfileSelect.appendChild(option);
+        });
+
+        const preferred = currentConfig.gameProfileId || catalog.defaults.gameProfileId;
+        const exists = catalog.gameProfiles.some((profile) => profile.id === preferred);
+        editProfileSelect.value = exists ? preferred : catalog.gameProfiles[0].id;
+
+        loadProfileIntoEditor(editProfileSelect.value);
+      }
+
+      function loadProfileIntoEditor(profileId) {
+        const profile = getProfileById(profileId);
+
+        if (!profile) {
+          return;
+        }
+
+        editProfileId.value = profile.id;
+        editProfileName.value = profile.name;
+        editProfileDescription.value = profile.description;
+        renderMappingRows(profile);
+        setEditorStatus(`Editing ${profile.name}.`);
+      }
+
+      function collectEditorProfile() {
+        const profile = {
+          id: String(editProfileId.value || "").trim().toLowerCase().replace(/[^a-z0-9_-]/g, ""),
+          name: String(editProfileName.value || "").trim(),
+          description: String(editProfileDescription.value || "").trim(),
+          keyboardMap: {},
+          virtualMap: {},
+        };
+
+        rowControls.forEach((controls, inputId) => {
+          const keyboardToken = controls.keyboardSelect.value;
+          const virtualAction = controls.virtualSelect.value;
+
+          if (keyboardToken) {
+            profile.keyboardMap[inputId] = keyboardToken;
+          }
+
+          if (virtualAction) {
+            profile.virtualMap[inputId] = [virtualAction];
+          }
+        });
+
+        return profile;
+      }
+
+      async function loadEditorPayload() {
+        const response = await fetch("/api/profiles/editor", { cache: "no-store" });
+        if (!response.ok) {
+          throw new Error("catalog fetch failed");
+        }
+
+        catalogPayload = await response.json();
+        populateSessionSelects();
+        populateEditorProfileSelect();
+      }
+
+      async function refreshCatalogAndKeepEditor(profileIdHint) {
+        await loadEditorPayload();
+
+        if (profileIdHint && getProfileById(profileIdHint)) {
+          editProfileSelect.value = profileIdHint;
+          loadProfileIntoEditor(profileIdHint);
+        }
+      }
+
+      function maybeCreateSession() {
+        if (!socket.connected || !catalogPayload || creatingSession) {
+          return;
+        }
+
+        createSession();
+      }
+
+      function createSession() {
+        const config = selectedConfig();
+
+        creatingSession = true;
+        socket.emit("host:create-session", { config }, (res) => {
+          creatingSession = false;
+
+          if (!res?.ok) {
+            appendLog("Session creation failed.");
+            return;
+          }
+
+          currentConfig = res.config || config;
+          syncConfigSelects();
+          renderConfigMeta();
+          setCode(res.code);
+          setConnectedCount(0);
+          setBridgeCount(0);
+          appendLog(`Session ${res.code} created.`);
+        });
+      }
+
+      function updateConfig() {
+        currentConfig = selectedConfig();
+        renderConfigMeta();
+
+        if (!sessionCode) {
+          return;
+        }
+
+        socket.emit("host:update-config", { config: currentConfig }, (res) => {
+          if (!res?.ok) {
+            appendLog("Config update failed.");
+            return;
+          }
+
+          currentConfig = res.config;
+          syncConfigSelects();
+          renderConfigMeta();
+          appendLog(`Config -> ${getGameProfileName(currentConfig.gameProfileId)} / ${getLayoutName(currentConfig.layoutId)}`);
+        });
+      }
+
+      async function saveCurrentProfile() {
+        const existingProfileId = editProfileSelect.value;
+        const profile = collectEditorProfile();
+
+        if (!profile.id || !profile.name) {
+          setEditorStatus("Profile id and name are required.");
+          return;
+        }
+
+        if (profile.id !== existingProfileId) {
+          setEditorStatus("Use Save As New when changing the profile id.");
+          return;
+        }
+
+        const response = await fetch(`/api/profiles/game/${encodeURIComponent(existingProfileId)}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ profile }),
+        });
+
+        const result = await response.json();
+
+        if (!result.ok) {
+          setEditorStatus(`Save failed: ${result.error || "unknown error"}`);
+          return;
+        }
+
+        await refreshCatalogAndKeepEditor(profile.id);
+        appendLog(`Profile ${profile.id} updated.`);
+        setEditorStatus(`Saved ${profile.name}.`);
+      }
+
+      async function saveProfileAsNew() {
+        const profile = collectEditorProfile();
+
+        if (!profile.id || !profile.name) {
+          setEditorStatus("Profile id and name are required.");
+          return;
+        }
+
+        const response = await fetch("/api/profiles/game", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ profile }),
+        });
+
+        const result = await response.json();
+
+        if (!result.ok) {
+          setEditorStatus(`Create failed: ${result.error || "unknown error"}`);
+          return;
+        }
+
+        await refreshCatalogAndKeepEditor(profile.id);
+        appendLog(`Profile ${profile.id} created.`);
+        setEditorStatus(`Created ${profile.name}.`);
+      }
+
+      async function deleteCurrentProfile() {
+        const profileId = editProfileSelect.value;
+
+        if (!profileId) {
+          return;
+        }
+
+        const accepted = window.confirm(`Delete profile ${profileId}?`);
+        if (!accepted) {
+          return;
+        }
+
+        const response = await fetch(`/api/profiles/game/${encodeURIComponent(profileId)}`, {
+          method: "DELETE",
+        });
+
+        const result = await response.json();
+
+        if (!result.ok) {
+          setEditorStatus(`Delete failed: ${result.error || "unknown error"}`);
+          return;
+        }
+
+        await refreshCatalogAndKeepEditor(null);
+        appendLog(`Profile ${profileId} deleted.`);
+        setEditorStatus(`Deleted ${profileId}.`);
+      }
+
+      document.getElementById("copyBtn").addEventListener("click", async () => {
+        if (!sessionCode) {
+          return;
+        }
+
+        const link = `${window.location.origin}/controller?code=${encodeURIComponent(sessionCode)}`;
+
+        try {
+          await navigator.clipboard.writeText(link);
+          appendLog("Join link copied to clipboard.");
+        } catch (_error) {
+          appendLog("Clipboard blocked; copy manually.");
+        }
+      });
+
+      document.getElementById("resetBtn").addEventListener("click", createSession);
+
+      gameProfileSelect.addEventListener("change", updateConfig);
+      layoutSelect.addEventListener("change", updateConfig);
+      virtualDeviceSelect.addEventListener("change", updateBridgeCommand);
+
+      profileEditorToggle.addEventListener("click", () => {
+        editorOpen = !editorOpen;
+        profileEditorPanel.classList.toggle("open", editorOpen);
+        profileEditorPanel.setAttribute("aria-hidden", String(!editorOpen));
+        profileEditorToggle.textContent = editorOpen ? "Close Profile Editor" : "Open Profile Editor";
+      });
+
+      editProfileSelect.addEventListener("change", () => {
+        loadProfileIntoEditor(editProfileSelect.value);
+      });
+
+      document.getElementById("saveProfileBtn").addEventListener("click", () => {
+        saveCurrentProfile().catch((error) => {
+          setEditorStatus(`Save failed: ${error.message}`);
+        });
+      });
+
+      document.getElementById("saveAsNewBtn").addEventListener("click", () => {
+        saveProfileAsNew().catch((error) => {
+          setEditorStatus(`Create failed: ${error.message}`);
+        });
+      });
+
+      document.getElementById("deleteProfileBtn").addEventListener("click", () => {
+        deleteCurrentProfile().catch((error) => {
+          setEditorStatus(`Delete failed: ${error.message}`);
+        });
+      });
+
+      document.getElementById("reloadProfilesBtn").addEventListener("click", () => {
+        refreshCatalogAndKeepEditor(editProfileSelect.value)
+          .then(() => setEditorStatus("Reloaded catalog."))
+          .catch((error) => setEditorStatus(`Reload failed: ${error.message}`));
+      });
+
+      socket.on("connect", () => {
+        appendLog("Socket connected.");
+        maybeCreateSession();
+      });
+
+      socket.on("session:controller-connected", (info) => {
+        setConnectedCount(info.count || connectedControllers + 1);
+        appendLog(`Controller connected (${info.controllerId.slice(0, 5)}).`);
+      });
+
+      socket.on("session:controller-disconnected", (info) => {
+        setConnectedCount(info.count || Math.max(0, connectedControllers - 1));
+        appendLog("Controller disconnected.");
+      });
+
+      socket.on("session:bridge-connected", (info) => {
+        setBridgeCount(info.count || connectedBridges + 1);
+        appendLog(`Bridge connected (${info.name || "Bridge"}).`);
+      });
+
+      socket.on("session:bridge-disconnected", (info) => {
+        setBridgeCount(info.count || Math.max(0, connectedBridges - 1));
+        appendLog(`Bridge disconnected (${info.name || "Bridge"}).`);
+      });
+
+      socket.on("session:config-updated", ({ config }) => {
+        if (!config) {
+          return;
+        }
+
+        currentConfig = config;
+        syncConfigSelects();
+        renderConfigMeta();
+      });
+
+      socket.on("session:input", ({ controllerId, at, payload }) => {
+        applyInput(payload || {});
+        const age = Math.max(0, Date.now() - (at || Date.now()));
+        latencyEl.textContent = `Last update: ${age}ms`;
+
+        if (payload?.event) {
+          appendLog(`${controllerId.slice(0, 4)} -> ${payload.event}`);
+        }
+      });
+
+      socket.on("session:closed", () => {
+        setConnectedCount(0);
+        setBridgeCount(0);
+        appendLog("Session closed.");
+      });
+
+      updateBridgeCommand();
+      loadEditorPayload()
+        .then(() => {
+          maybeCreateSession();
+        })
+        .catch((error) => {
+          appendLog(`Failed to load profile catalog: ${error.message}`);
+        });
+    </script>
+  </body>
+</html>

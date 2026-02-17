@@ -1,0 +1,714 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <title>AIR Controller | Mobile</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Sans:wght@400;500;700&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --bg: #050b13;
+        --bg2: #091c33;
+        --panel: rgba(8, 20, 37, 0.9);
+        --trace: #39efc7;
+        --accent: #ff9c42;
+        --text: #eff8ff;
+      }
+
+      * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+        overflow: hidden;
+        touch-action: none;
+      }
+
+      body {
+        font-family: "IBM Plex Sans", sans-serif;
+        color: var(--text);
+        background:
+          radial-gradient(circle at 90% 14%, rgba(255, 156, 66, 0.22), transparent 35%),
+          radial-gradient(circle at 8% 90%, rgba(57, 239, 199, 0.28), transparent 44%),
+          linear-gradient(160deg, var(--bg), var(--bg2));
+        padding: 0.8rem;
+        display: grid;
+      }
+
+      .app {
+        border-radius: 22px;
+        border: 1px solid rgba(255, 255, 255, 0.16);
+        background: linear-gradient(170deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.015));
+        backdrop-filter: blur(8px);
+        padding: 0.75rem;
+        display: grid;
+        grid-template-rows: auto auto auto 1fr auto;
+        gap: 0.7rem;
+      }
+
+      .top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .brand {
+        font-family: "Bebas Neue", cursive;
+        letter-spacing: 0.08em;
+        font-size: 1.5rem;
+      }
+
+      .status {
+        font-size: 0.75rem;
+        font-weight: 700;
+        padding: 0.28rem 0.55rem;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.25);
+      }
+
+      .status.on {
+        border: none;
+        color: #041a13;
+        background: linear-gradient(100deg, var(--trace), #bffceb);
+      }
+
+      .join {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 0.5rem;
+      }
+
+      input,
+      button {
+        border: none;
+        border-radius: 10px;
+        padding: 0.64rem 0.72rem;
+        font-size: 1rem;
+        font-family: inherit;
+      }
+
+      input {
+        background: rgba(255, 255, 255, 0.09);
+        color: var(--text);
+        font-family: "Bebas Neue", cursive;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+      }
+
+      button {
+        color: #0b150f;
+        font-weight: 700;
+        background: linear-gradient(110deg, var(--trace), #b8fceb);
+      }
+
+      .meta {
+        margin: 0;
+        border-radius: 9px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        background: rgba(255, 255, 255, 0.05);
+        padding: 0.35rem 0.52rem;
+        font-size: 0.76rem;
+        line-height: 1.35;
+      }
+
+      .controls {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.68rem;
+      }
+
+      .panel {
+        border: 1px solid rgba(255, 255, 255, 0.14);
+        background: var(--panel);
+        border-radius: 14px;
+        padding: 0.62rem;
+      }
+
+      .title {
+        font-family: "Bebas Neue", cursive;
+        letter-spacing: 0.07em;
+        margin: 0 0 0.42rem;
+        font-size: 1.02rem;
+      }
+
+      .pair {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.36rem;
+      }
+
+      .stick-zone {
+        width: min(35vw, 190px);
+        aspect-ratio: 1 / 1;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        margin-inline: auto;
+        position: relative;
+        background:
+          radial-gradient(circle at 50% 50%, rgba(57, 239, 199, 0.2), transparent 65%),
+          linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0));
+      }
+
+      .stick-zone::after {
+        content: attr(data-label);
+        position: absolute;
+        bottom: 8px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-size: 0.7rem;
+        letter-spacing: 0.04em;
+        opacity: 0.78;
+      }
+
+      .stick-knob {
+        position: absolute;
+        width: 30%;
+        aspect-ratio: 1 / 1;
+        border-radius: 999px;
+        background: linear-gradient(130deg, #5bf5d5, #d2fff4);
+        box-shadow: 0 0 26px rgba(57, 239, 199, 0.38);
+        left: 50%;
+        top: 50%;
+        transform: translate(-50%, -50%);
+      }
+
+      .control-btn {
+        display: grid;
+        place-items: center;
+        border-radius: 11px;
+        min-height: 48px;
+        font-family: "Bebas Neue", cursive;
+        font-size: 1.05rem;
+        letter-spacing: 0.08em;
+        color: #eafff9;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        background: rgba(255, 255, 255, 0.08);
+        user-select: none;
+      }
+
+      .control-btn.face {
+        min-height: 66px;
+        font-size: 1.35rem;
+        color: #082320;
+      }
+
+      .control-btn[data-button="a"] { background: linear-gradient(140deg, #3beec6, #9dfce6); }
+      .control-btn[data-button="b"] { background: linear-gradient(140deg, #ffaa5b, #ffd5a7); color: #2e1400; }
+      .control-btn[data-button="x"] { background: linear-gradient(140deg, #81d7ff, #d3efff); }
+      .control-btn[data-button="y"] { background: linear-gradient(140deg, #ffe06b, #ffefac); color: #2b2300; }
+
+      .control-btn.active {
+        transform: scale(0.97);
+        filter: brightness(0.95) saturate(1.18);
+      }
+
+      .dpad {
+        margin-top: 0.45rem;
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 0.3rem;
+      }
+
+      .dpad .control-btn {
+        min-height: 40px;
+        font-size: 1rem;
+      }
+
+      .face-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 0.4rem;
+      }
+
+      .utility {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 0.35rem;
+      }
+
+      .log {
+        margin: 0.15rem 0 0;
+        font-size: 0.77rem;
+        opacity: 0.84;
+      }
+
+      @media (max-width: 760px) {
+        .controls {
+          grid-template-columns: 1fr;
+        }
+
+        .stick-zone {
+          width: min(52vw, 235px);
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="app">
+      <div class="top">
+        <div class="brand">AIR CTRL</div>
+        <div id="status" class="status">OFFLINE</div>
+      </div>
+
+      <div class="join">
+        <input id="codeInput" maxlength="6" placeholder="SESSION" />
+        <button id="joinBtn" type="button">Connect</button>
+      </div>
+
+      <p id="configMeta" class="meta">Mapping: -- | Layout: --</p>
+
+      <section class="controls">
+        <div id="leftPanel" class="panel">
+          <p class="title">Movement</p>
+          <div class="pair">
+            <div class="control-btn" data-button="lb">LB</div>
+            <div class="control-btn" data-button="rb">RB</div>
+          </div>
+          <div id="leftStickZone" class="stick-zone" data-label="LEFT STICK">
+            <div id="leftStickKnob" class="stick-knob"></div>
+          </div>
+          <div class="dpad">
+            <div></div>
+            <div class="control-btn" data-button="up">UP</div>
+            <div></div>
+            <div class="control-btn" data-button="left">LT</div>
+            <div class="control-btn" data-button="down">DN</div>
+            <div class="control-btn" data-button="right">RT</div>
+          </div>
+        </div>
+
+        <div id="rightPanel" class="panel">
+          <p class="title">Action</p>
+          <div class="pair">
+            <div class="control-btn" data-button="lt">LT</div>
+            <div class="control-btn" data-button="rt">RT</div>
+          </div>
+          <div id="rightStickZone" class="stick-zone" data-label="RIGHT STICK">
+            <div id="rightStickKnob" class="stick-knob"></div>
+          </div>
+          <div class="face-grid">
+            <div class="control-btn face" data-button="x">X</div>
+            <div class="control-btn face" data-button="y">Y</div>
+            <div class="control-btn face" data-button="a">A</div>
+            <div class="control-btn face" data-button="b">B</div>
+          </div>
+        </div>
+      </section>
+
+      <section class="panel">
+        <div class="utility">
+          <div class="control-btn" data-button="select">SELECT</div>
+          <div class="control-btn" data-button="start">START</div>
+          <div class="control-btn" data-button="ls">L3</div>
+          <div class="control-btn" data-button="rs">R3</div>
+        </div>
+        <p id="log" class="log">Waiting for connection.</p>
+      </section>
+    </main>
+
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+      const socket = io();
+
+      const BUTTON_IDS = [
+        "up", "down", "left", "right",
+        "a", "b", "x", "y",
+        "lb", "rb", "lt", "rt",
+        "start", "select", "ls", "rs",
+      ];
+
+      const fallbackCatalog = {
+        defaults: {
+          gameProfileId: "platformer",
+          layoutId: "balanced",
+        },
+        gameProfiles: [
+          { id: "platformer", name: "Platformer", description: "Default" },
+        ],
+        layouts: [
+          {
+            id: "balanced",
+            name: "Balanced",
+            description: "Default",
+            panelOrder: ["stick", "action"],
+            buttonGrid: ["x", "y", "a", "b"],
+            buttonLabels: { a: "A", b: "B", x: "X", y: "Y" },
+            dpadLabels: { up: "UP", down: "DN", left: "LT", right: "RT" },
+            utilityLabels: { lb: "LB", rb: "RB", lt: "LT", rt: "RT", start: "START", select: "SELECT", ls: "L3", rs: "R3" },
+          },
+        ],
+      };
+
+      const statusEl = document.getElementById("status");
+      const codeInput = document.getElementById("codeInput");
+      const joinBtn = document.getElementById("joinBtn");
+      const logEl = document.getElementById("log");
+      const configMetaEl = document.getElementById("configMeta");
+
+      const leftPanel = document.getElementById("leftPanel");
+      const rightPanel = document.getElementById("rightPanel");
+      const leftStickZone = document.getElementById("leftStickZone");
+      const rightStickZone = document.getElementById("rightStickZone");
+      const leftStickKnob = document.getElementById("leftStickKnob");
+      const rightStickKnob = document.getElementById("rightStickKnob");
+      const controlButtons = Array.from(document.querySelectorAll(".control-btn[data-button]"));
+      const buttonNodeMap = new Map(controlButtons.map((node) => [node.dataset.button, node]));
+
+      const state = {
+        connected: false,
+        code: "",
+        buttons: Object.fromEntries(BUTTON_IDS.map((id) => [id, false])),
+        leftStick: { x: 0, y: 0 },
+        rightStick: { x: 0, y: 0 },
+        config: {
+          gameProfileId: "platformer",
+          layoutId: "balanced",
+        },
+      };
+
+      const buttonSources = Object.fromEntries(BUTTON_IDS.map((id) => [id, new Set()]));
+      const stickPointers = { left: null, right: null };
+
+      let catalog = fallbackCatalog;
+      let layoutMap = new Map(catalog.layouts.map((layout) => [layout.id, layout]));
+      let gameProfileMap = new Map(catalog.gameProfiles.map((profile) => [profile.id, profile]));
+      let lastSend = 0;
+      let hasAttemptedAutoJoin = false;
+
+      function log(message) {
+        logEl.textContent = message;
+      }
+
+      function setConnected(isConnected) {
+        state.connected = isConnected;
+        statusEl.classList.toggle("on", isConnected);
+        statusEl.textContent = isConnected ? "CONNECTED" : "OFFLINE";
+      }
+
+      function sendInput(eventName) {
+        if (!state.connected) return;
+
+        const now = Date.now();
+        if (now - lastSend < 16 && !eventName) return;
+        lastSend = now;
+
+        const pressed = BUTTON_IDS.filter((id) => state.buttons[id]);
+
+        socket.emit("controller:input", {
+          event: eventName || "frame",
+          buttons: state.buttons,
+          pressed,
+          leftStick: state.leftStick,
+          rightStick: state.rightStick,
+          stick: state.leftStick,
+          triggers: {
+            lt: state.buttons.lt ? 1 : 0,
+            rt: state.buttons.rt ? 1 : 0,
+          },
+        });
+      }
+
+      function normalizeCode(value) {
+        return String(value || "").toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 6);
+      }
+
+      function getLayout(layoutId) {
+        return layoutMap.get(layoutId) || layoutMap.get(catalog.defaults.layoutId) || fallbackCatalog.layouts[0];
+      }
+
+      function getGameProfile(gameProfileId) {
+        return gameProfileMap.get(gameProfileId) || gameProfileMap.get(catalog.defaults.gameProfileId) || fallbackCatalog.gameProfiles[0];
+      }
+
+      function applyLayout(layoutId) {
+        const layout = getLayout(layoutId);
+
+        const stickOrder = layout.panelOrder.indexOf("stick");
+        const actionOrder = layout.panelOrder.indexOf("action");
+        leftPanel.style.order = String(stickOrder < 0 ? 0 : stickOrder);
+        rightPanel.style.order = String(actionOrder < 0 ? 1 : actionOrder);
+
+        layout.buttonGrid.forEach((buttonName, index) => {
+          const node = buttonNodeMap.get(buttonName);
+          if (node) {
+            node.style.order = String(index);
+          }
+        });
+
+        ["a", "b", "x", "y"].forEach((id) => {
+          const node = buttonNodeMap.get(id);
+          if (node) {
+            node.textContent = layout.buttonLabels?.[id] || id.toUpperCase();
+          }
+        });
+
+        ["up", "down", "left", "right"].forEach((id) => {
+          const node = buttonNodeMap.get(id);
+          if (node) {
+            node.textContent = layout.dpadLabels?.[id] || id.toUpperCase();
+          }
+        });
+
+        ["lb", "rb", "lt", "rt", "start", "select", "ls", "rs"].forEach((id) => {
+          const node = buttonNodeMap.get(id);
+          if (node) {
+            node.textContent = layout.utilityLabels?.[id] || id.toUpperCase();
+          }
+        });
+      }
+
+      function renderConfigMeta() {
+        const gameProfile = getGameProfile(state.config.gameProfileId);
+        const layout = getLayout(state.config.layoutId);
+        configMetaEl.textContent = `Mapping: ${gameProfile.name} | Layout: ${layout.name}`;
+      }
+
+      function applyConfig(config = {}) {
+        state.config = {
+          gameProfileId: config.gameProfileId || state.config.gameProfileId || catalog.defaults.gameProfileId,
+          layoutId: config.layoutId || state.config.layoutId || catalog.defaults.layoutId,
+        };
+
+        applyLayout(state.config.layoutId);
+        renderConfigMeta();
+      }
+
+      function joinSession() {
+        const code = normalizeCode(codeInput.value);
+
+        if (!code) {
+          log("Enter a 6 character session code.");
+          return;
+        }
+
+        socket.emit("controller:join-session", { code }, (res) => {
+          if (!res?.ok) {
+            setConnected(false);
+            log("Session not found. Check code and retry.");
+            return;
+          }
+
+          state.code = code;
+          codeInput.value = code;
+          applyConfig(res.config || {});
+          setConnected(true);
+          log(`Connected to ${code}.`);
+          sendInput("connected");
+        });
+      }
+
+      function updateButtonVisuals() {
+        BUTTON_IDS.forEach((id) => {
+          const node = buttonNodeMap.get(id);
+          if (!node) return;
+          node.classList.toggle("active", Boolean(state.buttons[id]));
+        });
+      }
+
+      function updateStickVisual(which) {
+        const stick = which === "left" ? state.leftStick : state.rightStick;
+        const knob = which === "left" ? leftStickKnob : rightStickKnob;
+        const x = Math.max(-1, Math.min(1, stick.x)) * 33;
+        const y = Math.max(-1, Math.min(1, stick.y)) * 33;
+        knob.style.transform = `translate(calc(-50% + ${x}px), calc(-50% + ${y}px))`;
+      }
+
+      function setButtonSource(name, source, active, opts = {}) {
+        if (!buttonSources[name]) {
+          return;
+        }
+
+        const sources = buttonSources[name];
+        if (active) {
+          sources.add(source);
+        } else {
+          sources.delete(source);
+        }
+
+        const next = sources.size > 0;
+        const changed = state.buttons[name] !== next;
+        state.buttons[name] = next;
+
+        if (changed) {
+          updateButtonVisuals();
+
+          if (!opts.silent) {
+            const eventName = opts.eventName || `button:${name}:${next ? "down" : "up"}`;
+            sendInput(eventName);
+          }
+        }
+      }
+
+      function updateAxisDpad(dx, dy) {
+        setButtonSource("left", "left-stick-axis", dx < -0.45, { silent: true });
+        setButtonSource("right", "left-stick-axis", dx > 0.45, { silent: true });
+        setButtonSource("up", "left-stick-axis", dy < -0.45, { silent: true });
+        setButtonSource("down", "left-stick-axis", dy > 0.45, { silent: true });
+      }
+
+      function handleStickPointer(which, clientX, clientY) {
+        const zone = which === "left" ? leftStickZone : rightStickZone;
+        const rect = zone.getBoundingClientRect();
+        const cx = rect.left + rect.width / 2;
+        const cy = rect.top + rect.height / 2;
+        const radius = rect.width / 2;
+
+        let dx = (clientX - cx) / radius;
+        let dy = (clientY - cy) / radius;
+
+        const mag = Math.hypot(dx, dy);
+        if (mag > 1) {
+          dx /= mag;
+          dy /= mag;
+        }
+
+        if (which === "left") {
+          state.leftStick.x = Number(dx.toFixed(3));
+          state.leftStick.y = Number(dy.toFixed(3));
+          updateAxisDpad(state.leftStick.x, state.leftStick.y);
+        } else {
+          state.rightStick.x = Number(dx.toFixed(3));
+          state.rightStick.y = Number(dy.toFixed(3));
+        }
+
+        updateStickVisual(which);
+        sendInput();
+      }
+
+      function releaseStick(which) {
+        if (which === "left") {
+          state.leftStick.x = 0;
+          state.leftStick.y = 0;
+          updateAxisDpad(0, 0);
+        } else {
+          state.rightStick.x = 0;
+          state.rightStick.y = 0;
+        }
+
+        updateStickVisual(which);
+        sendInput(`${which}-stick:center`);
+      }
+
+      function bindButtonPointer(node, name) {
+        const source = `touch:${name}`;
+
+        const press = (evt) => {
+          evt.preventDefault();
+          setButtonSource(name, source, true, { eventName: `button:${name}:down` });
+          node.setPointerCapture?.(evt.pointerId);
+        };
+
+        const release = (evt) => {
+          evt.preventDefault();
+          setButtonSource(name, source, false, { eventName: `button:${name}:up` });
+        };
+
+        node.addEventListener("pointerdown", press);
+        node.addEventListener("pointerup", release);
+        node.addEventListener("pointercancel", release);
+        node.addEventListener("pointerleave", release);
+      }
+
+      function bindStickPointer(which, zone) {
+        zone.addEventListener("pointerdown", (evt) => {
+          evt.preventDefault();
+          stickPointers[which] = evt.pointerId;
+          zone.setPointerCapture(evt.pointerId);
+          handleStickPointer(which, evt.clientX, evt.clientY);
+        });
+
+        zone.addEventListener("pointermove", (evt) => {
+          if (evt.pointerId !== stickPointers[which]) return;
+          handleStickPointer(which, evt.clientX, evt.clientY);
+        });
+
+        const end = (evt) => {
+          if (evt.pointerId !== stickPointers[which]) return;
+          stickPointers[which] = null;
+          releaseStick(which);
+        };
+
+        zone.addEventListener("pointerup", end);
+        zone.addEventListener("pointercancel", end);
+      }
+
+      controlButtons.forEach((node) => {
+        bindButtonPointer(node, node.dataset.button);
+      });
+
+      bindStickPointer("left", leftStickZone);
+      bindStickPointer("right", rightStickZone);
+
+      joinBtn.addEventListener("click", joinSession);
+      codeInput.addEventListener("input", () => {
+        codeInput.value = normalizeCode(codeInput.value);
+      });
+      codeInput.addEventListener("keydown", (evt) => {
+        if (evt.key === "Enter") joinSession();
+      });
+
+      socket.on("connect", () => {
+        if (state.code) {
+          joinSession();
+          return;
+        }
+
+        if (!hasAttemptedAutoJoin && codeInput.value.length === 6) {
+          hasAttemptedAutoJoin = true;
+          joinSession();
+          return;
+        }
+
+        log("Connected to server. Enter host code.");
+      });
+
+      socket.on("disconnect", () => {
+        setConnected(false);
+        log("Connection lost. Waiting to reconnect...");
+      });
+
+      socket.on("session:config-updated", ({ config }) => {
+        if (!config) return;
+        applyConfig(config);
+        log(`Profile switched to ${getGameProfile(config.gameProfileId).name}.`);
+      });
+
+      socket.on("session:closed", () => {
+        setConnected(false);
+        log("Host ended session.");
+      });
+
+      async function loadCatalog() {
+        try {
+          const response = await fetch("/api/profiles", { cache: "no-store" });
+          catalog = await response.json();
+        } catch (_error) {
+          catalog = fallbackCatalog;
+        }
+
+        layoutMap = new Map(catalog.layouts.map((layout) => [layout.id, layout]));
+        gameProfileMap = new Map(catalog.gameProfiles.map((profile) => [profile.id, profile]));
+
+        if (!state.config.gameProfileId) {
+          state.config.gameProfileId = catalog.defaults.gameProfileId;
+        }
+
+        if (!state.config.layoutId) {
+          state.config.layoutId = catalog.defaults.layoutId;
+        }
+
+        applyConfig(state.config);
+      }
+
+      const urlCode = new URLSearchParams(window.location.search).get("code");
+      if (urlCode) {
+        codeInput.value = normalizeCode(urlCode);
+      }
+
+      loadCatalog();
+    </script>
+  </body>
+</html>
