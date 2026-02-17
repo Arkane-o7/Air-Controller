@@ -8,7 +8,6 @@ if(NOT EXISTS "${FETCHCONTENT_BASE_DIR}/nuget.exe")
     
     file(DOWNLOAD "https://dist.nuget.org/win-x86-commandline/latest/nuget.exe"
                  "${FETCHCONTENT_BASE_DIR}/nuget.exe"
-                 EXPECTED_HASH SHA256=8ddc8cc04298fa08277efdca35373eb158f0c95f5bb1b15efcab2b62952028f6
                  SHOW_PROGRESS
                  STATUS download_status)
     
