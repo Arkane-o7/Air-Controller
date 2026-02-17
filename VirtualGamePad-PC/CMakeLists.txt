@@ -65,7 +65,7 @@ set(QR_CODE_GEN_SOURCES
     third-party-libs/QR-Code-generator/cpp/qrcodegen.hpp
 )
 
-add_library(QR_Code_Generator SHARED ${QR_CODE_GEN_SOURCES})
+add_library(QR_Code_Generator STATIC ${QR_CODE_GEN_SOURCES})
 
 # Manifest file for the application
 # This file is used to request permissions on Windows
