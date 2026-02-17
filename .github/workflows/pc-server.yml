@@ -49,3 +49,37 @@ jobs:
 
       - name: Build PC server
         run: ./scripts/build_pc.sh
+
+      - name: Package PC server (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          cd VirtualGamePad-PC
+          rm -rf dist
+          mkdir -p dist
+          cmake --install build-linux --prefix "$PWD/dist" --config Release
+          cd dist
+          zip -r ../../Virtual-GamePad-Ubuntu.zip .
+
+      - name: Package PC server (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          cd VirtualGamePad-PC
+          rm -rf dist
+          mkdir -p dist
+          cmake --install build-windows --prefix "$PWD/dist" --config Release
+          cd ..
+          pwsh -NoLogo -NoProfile -Command "Compress-Archive -Path VirtualGamePad-PC/dist/* -DestinationPath Virtual-GamePad-Windows.zip -Force"
+
+      - name: Upload Linux package
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pc-server-linux-zip
+          path: Virtual-GamePad-Ubuntu.zip
+
+      - name: Upload Windows package
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pc-server-windows-zip
+          path: Virtual-GamePad-Windows.zip
