@@ -79,7 +79,7 @@ cd desktop-app
 npm run build:win
 ```
 
-Linux packages (AppImage + deb):
+Linux package (AppImage):
 
 ```bash
 cd desktop-app

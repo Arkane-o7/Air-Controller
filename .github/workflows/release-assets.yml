@@ -99,7 +99,6 @@ jobs:
           fail_on_unmatched_files: false
           files: |
             desktop-app/dist/*.AppImage
-            desktop-app/dist/*.deb
             desktop-app/dist/latest*.yml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

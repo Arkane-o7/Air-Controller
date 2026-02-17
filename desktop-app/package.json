@@ -9,7 +9,7 @@
     "dev": "electron .",
     "dist": "electron-builder",
     "build:win": "electron-builder --win nsis",
-    "build:linux": "electron-builder --linux AppImage deb"
+    "build:linux": "electron-builder --linux AppImage"
   },
   "dependencies": {
     "@nut-tree-fork/nut-js": "^4.2.6",
@@ -41,8 +41,7 @@
     },
     "linux": {
       "target": [
-        "AppImage",
-        "deb"
+        "AppImage"
       ],
       "category": "Game"
     }
