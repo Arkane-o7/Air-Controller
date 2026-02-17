@@ -12,6 +12,7 @@ concurrency:
 on:
   push:
     paths:
+      - "index.md"
       - "README.md"
       - "FAQ.md"
       - "Troubleshooting.md"
@@ -28,6 +29,7 @@ on:
       - ".github/workflows/website.yml"
   pull_request:
     paths:
+      - "index.md"
       - "README.md"
       - "FAQ.md"
       - "Troubleshooting.md"
