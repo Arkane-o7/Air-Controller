@@ -144,6 +144,10 @@ else()
     message(STATUS "Building in INSTALLABLE mode - data stored in standard OS locations")
 endif()
 
+if(WIN32)
+    target_compile_definitions(VGamepadPC PRIVATE NOMINMAX)
+endif()
+
 # Platform-specific linking and include directories
 if(WIN32)
     target_link_libraries(VGamepadPC PRIVATE

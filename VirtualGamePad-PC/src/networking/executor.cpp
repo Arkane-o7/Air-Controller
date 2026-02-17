@@ -37,7 +37,7 @@ std::pair<float, float> circleToSquare(float x, float y)
 	float scale = (std::abs(nx) > std::abs(ny)) ? (1.0f / std::abs(nx)) : (1.0f / std::abs(ny));
 
 	// Apply magnitude limits and return
-	float clampedMagnitude = std::min(magnitude, 1.0f);
+	float clampedMagnitude = (std::min)(magnitude, 1.0f);
 	return {nx * scale * clampedMagnitude, ny * scale * clampedMagnitude};
 }
 
@@ -244,7 +244,7 @@ void KeyboardMouseExecutor::handleThumbstickInput(const ThumbstickInput &thumbst
 		// qDebug() << "Moving mouse by offset:" << offsetX << "," << offsetY;
 
 		// Break movement into steps for smooth movement
-		int maxSteps = std::max(std::abs(offsetX), std::abs(offsetY));
+		int maxSteps = (std::max)(std::abs(offsetX), std::abs(offsetY));
 		if (maxSteps > 0)
 		{
 			for (int step = 1; step <= maxSteps; ++step)
