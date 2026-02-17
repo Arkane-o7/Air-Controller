@@ -1,0 +1,51 @@
+name: PC Server
+
+on:
+  push:
+    paths:
+      - "VirtualGamePad-PC/**"
+      - "VGP_Data_Exchange/**"
+      - "scripts/build_pc.sh"
+      - "scripts/sync_data_exchange.sh"
+      - ".github/workflows/pc-server.yml"
+  pull_request:
+    paths:
+      - "VirtualGamePad-PC/**"
+      - "VGP_Data_Exchange/**"
+      - "scripts/build_pc.sh"
+      - "scripts/sync_data_exchange.sh"
+      - ".github/workflows/pc-server.yml"
+  workflow_dispatch:
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libevdev-dev ninja-build
+
+      - name: Setup MSVC toolchain
+        if: runner.os == 'Windows'
+        uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Setup Qt
+        uses: jurplel/install-qt-action@v4
+        with:
+          version: "6.8.2"
+          cache: true
+
+      - name: Build PC server
+        run: ./scripts/build_pc.sh

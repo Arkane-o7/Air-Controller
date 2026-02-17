@@ -1,0 +1,86 @@
+[versions]
+# Android
+android-gradle-plugin = "8.13.2"
+
+# Kotlin
+kotlin = "2.3.0"
+kotlinx-serialization-json = "1.9.0"
+
+# AndroidX Core
+androidx-core-ktx = "1.17.0"
+androidx-lifecycle = "2.10.0"
+androidx-activity-compose = "1.12.2"
+androidx-window = "1.5.1"
+androidx-datastore = "1.2.0"
+
+# Compose
+compose-bom = "2025.12.01"
+compose-navigation = "2.9.6"
+
+# QR Code Scanner
+zxing-android-embedded = "4.3.0"
+zxing-core = "3.5.4"
+
+# Testing
+junit = "4.13.2"
+kotlinx-coroutines-test = "1.10.2"
+
+# Tools
+desugar-jdk-libs = "2.1.5"
+dokka = "2.1.0"
+robolectric = "4.16"
+
+[libraries]
+# AndroidX Core
+androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "androidx-core-ktx" }
+androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "androidx-lifecycle" }
+androidx-activity-compose = { group = "androidx.activity", name = "activity-compose", version.ref = "androidx-activity-compose" }
+androidx-window = { group = "androidx.window", name = "window", version.ref = "androidx-window" }
+
+# Compose BOM
+compose-bom = { group = "androidx.compose", name = "compose-bom", version.ref = "compose-bom" }
+
+# Compose
+compose-ui = { group = "androidx.compose.ui", name = "ui" }
+compose-ui-tooling-preview = { group = "androidx.compose.ui", name = "ui-tooling-preview" }
+compose-ui-tooling = { group = "androidx.compose.ui", name = "ui-tooling" }
+compose-ui-test-manifest = { group = "androidx.compose.ui", name = "ui-test-manifest" }
+compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-test-junit4" }
+
+# Navigation
+navigation-fragment-ktx = { group = "androidx.navigation", name = "navigation-fragment-ktx", version.ref = "compose-navigation" }
+navigation-ui-ktx = { group = "androidx.navigation", name = "navigation-ui-ktx", version.ref = "compose-navigation" }
+navigation-testing = { group = "androidx.navigation", name = "navigation-testing", version.ref = "compose-navigation" }
+navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "compose-navigation" }
+
+# QR Code Scanner
+zxing-android-embedded = { group = "com.journeyapps", name = "zxing-android-embedded", version.ref = "zxing-android-embedded" }
+zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing-core" }
+
+# Material3
+material3 = { group = "androidx.compose.material3", name = "material3" }
+material3-window-size = { group = "androidx.compose.material3", name = "material3-window-size-class" }
+
+# Datastore
+androidx-datastore-preferences = { group = "androidx.datastore", name = "datastore-preferences", version.ref = "androidx-datastore" }
+
+# Tools
+desugar-jdk-libs = { group = "com.android.tools", name = "desugar_jdk_libs", version.ref = "desugar-jdk-libs" }
+
+# Serialization
+kotlinx-serialization-json = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "kotlinx-serialization-json" }
+
+# Testing
+junit = { group = "junit", name = "junit", version.ref = "junit" }
+kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "kotlinx-coroutines-test" }
+robolectric = { group = "org.robolectric", name = "robolectric", version.ref = "robolectric" }
+
+[plugins]
+android-application = { id = "com.android.application", version.ref = "android-gradle-plugin" }
+android-library = { id = "com.android.library", version.ref = "android-gradle-plugin" }
+kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
+kotlin-parcelize = { id = "org.jetbrains.kotlin.plugin.parcelize", version.ref = "kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
+dokka = { id = "org.jetbrains.dokka", version.ref = "dokka" }

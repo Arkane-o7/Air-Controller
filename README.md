@@ -105,6 +105,26 @@ Visit the [companion website](https://kitswas.github.io/VirtualGamePad-PC/) to s
 
 [kitswas/VGP_Data_Exchange](https://github.com/kitswas/VGP_Data_Exchange/) is used to handle the communication between the client and the server.
 
+## Monorepo layout (this repository)
+
+This repository includes all major source code components:
+
+- Website/docs at the repository root
+- Android client at `VirtualGamePad-Mobile/`
+- PC server at `VirtualGamePad-PC/`
+- Shared protocol module at `VGP_Data_Exchange/`
+
+Quick validation/build commands:
+
+```bash
+./scripts/validate_workspace.sh
+./scripts/sync_data_exchange.sh
+./scripts/build_website.sh
+./scripts/build_android.sh
+./scripts/build_pc.sh
+./scripts/build_all.sh
+```
+
 ### Star History
 
 <picture>

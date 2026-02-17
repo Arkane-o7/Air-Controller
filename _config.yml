@@ -48,3 +48,16 @@ hydejack:
 
     # Set to `true` to allow visitors to switch between light and dark mode.
     icon: true
+
+exclude:
+  - VirtualGamePad-Mobile
+  - VirtualGamePad-PC
+  - VGP_Data_Exchange
+  - scripts
+  - .github
+  - MONOREPO_STATUS.md
+  - Gemfile
+  - Gemfile.lock
+  - vendor
+  - .bundle
+  - .gradle-home
