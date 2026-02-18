@@ -161,7 +161,7 @@ export default function App() {
           {errorText ? <Text style={styles.errorText}>{errorText}</Text> : null}
 
           <Text style={styles.noteText}>
-            Tip: use the LAN URL shown in the desktop app (same Wi-Fi), then join with the 6-character session code.
+            Tip: use LAN URL for same Wi-Fi play, or enter a public relay URL to connect across different networks.
           </Text>
         </View>
       </KeyboardAvoidingView>

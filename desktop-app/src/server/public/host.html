@@ -372,6 +372,24 @@
           </div>
 
           <div class="row" style="margin-top: 0.6rem">
+            <label class="field">
+              <span>Connection Mode</span>
+              <select id="networkModeSelect">
+                <option value="lan">LAN (Same Wi-Fi)</option>
+                <option value="relay">Public Relay (Cloud)</option>
+              </select>
+            </label>
+            <label class="field">
+              <span>LAN Server URL</span>
+              <input id="lanOriginInput" placeholder="http://192.168.1.20:3000" />
+            </label>
+            <label class="field">
+              <span>Public Relay URL</span>
+              <input id="relayOriginInput" placeholder="https://air-controller.example.com" />
+            </label>
+          </div>
+
+          <div class="row" style="margin-top: 0.6rem">
             <div id="sessionCode" class="code">------</div>
             <button id="copyBtn" type="button">Copy Link</button>
             <button id="resetBtn" type="button" class="warn">New Session</button>
@@ -380,6 +398,7 @@
           <div id="joinUrl" class="url">Generating...</div>
           <div id="qrcode"></div>
 
+          <div class="meta" id="networkMeta">Mode: --</div>
           <div class="meta" id="configMeta">Mapping: -- | Layout: --</div>
           <div class="meta" id="connectedCount">Controllers connected: 0</div>
           <div class="meta" id="bridgeCount">Bridges connected: 0</div>
@@ -486,6 +505,10 @@
       const gameProfileSelect = document.getElementById("gameProfileSelect");
       const layoutSelect = document.getElementById("layoutSelect");
       const virtualDeviceSelect = document.getElementById("virtualDeviceSelect");
+      const networkModeSelect = document.getElementById("networkModeSelect");
+      const lanOriginInput = document.getElementById("lanOriginInput");
+      const relayOriginInput = document.getElementById("relayOriginInput");
+      const networkMetaEl = document.getElementById("networkMeta");
       const bridgeSetupCommandEl = document.getElementById("bridgeSetupCommand");
       const bridgeCommandEl = document.getElementById("bridgeCommand");
       const keyboardBridgeCommandEl = document.getElementById("keyboardBridgeCommand");
@@ -508,6 +531,19 @@
       let connectedBridges = 0;
       let creatingSession = false;
       let editorOpen = false;
+      const NETWORK_STORAGE_PREFIX = "air_controller.host.network";
+      const NETWORK_STORAGE_KEYS = {
+        mode: `${NETWORK_STORAGE_PREFIX}.mode`,
+        lanOrigin: `${NETWORK_STORAGE_PREFIX}.lanOrigin`,
+        relayOrigin: `${NETWORK_STORAGE_PREFIX}.relayOrigin`,
+      };
+      const networkState = {
+        mode: "lan",
+        serverOrigin: window.location.origin,
+        lanOrigin: "",
+        relayOrigin: "",
+        lanOrigins: [],
+      };
 
       let catalogPayload = null;
       let currentConfig = {
@@ -572,12 +608,125 @@
         configMetaEl.textContent = `Mapping: ${getGameProfileName(currentConfig.gameProfileId)} | Layout: ${getLayoutName(currentConfig.layoutId)}`;
       }
 
+      function normalizeOrigin(rawValue) {
+        const raw = String(rawValue || "").trim();
+        if (!raw) {
+          return "";
+        }
+
+        const withProtocol = /^https?:\/\//i.test(raw) ? raw : `http://${raw}`;
+        try {
+          const parsed = new URL(withProtocol);
+          return `${parsed.protocol}//${parsed.host}`.replace(/\/+$/, "");
+        } catch (_error) {
+          return "";
+        }
+      }
+
+      function isPrivateLanHost(hostname) {
+        return (
+          hostname === "localhost" ||
+          hostname === "127.0.0.1" ||
+          hostname === "::1" ||
+          /^10\./.test(hostname) ||
+          /^192\.168\./.test(hostname) ||
+          /^172\.(1[6-9]|2\d|3[0-1])\./.test(hostname)
+        );
+      }
+
+      function getActiveServerOrigin() {
+        if (networkState.mode === "relay") {
+          return networkState.relayOrigin || networkState.serverOrigin;
+        }
+
+        return networkState.lanOrigin || networkState.serverOrigin;
+      }
+
+      function buildJoinUrl(code) {
+        return `${getActiveServerOrigin()}/controller?code=${encodeURIComponent(code)}`;
+      }
+
+      function syncNetworkInputs() {
+        networkModeSelect.value = networkState.mode;
+        lanOriginInput.value = networkState.lanOrigin;
+        relayOriginInput.value = networkState.relayOrigin;
+      }
+
+      function persistNetworkState() {
+        localStorage.setItem(NETWORK_STORAGE_KEYS.mode, networkState.mode);
+        if (networkState.lanOrigin) {
+          localStorage.setItem(NETWORK_STORAGE_KEYS.lanOrigin, networkState.lanOrigin);
+        } else {
+          localStorage.removeItem(NETWORK_STORAGE_KEYS.lanOrigin);
+        }
+
+        if (networkState.relayOrigin) {
+          localStorage.setItem(NETWORK_STORAGE_KEYS.relayOrigin, networkState.relayOrigin);
+        } else {
+          localStorage.removeItem(NETWORK_STORAGE_KEYS.relayOrigin);
+        }
+      }
+
+      function renderNetworkMeta() {
+        const activeOrigin = getActiveServerOrigin();
+        if (!activeOrigin) {
+          networkMetaEl.textContent = "Mode: configure LAN or Relay URL.";
+          return;
+        }
+
+        if (networkState.mode === "relay") {
+          networkMetaEl.textContent = `Mode: Public Relay | Join via ${activeOrigin}`;
+          return;
+        }
+
+        let hostLabel = "";
+        try {
+          hostLabel = new URL(activeOrigin).hostname;
+        } catch (_error) {
+          hostLabel = "";
+        }
+        const lanHint = networkState.lanOrigins.length
+          ? `Detected LAN hosts: ${networkState.lanOrigins.join(", ")}`
+          : "No LAN interface detected automatically.";
+
+        if (hostLabel && !isPrivateLanHost(hostLabel)) {
+          networkMetaEl.textContent = `Mode: LAN | Current host may be public (${activeOrigin}). ${lanHint}`;
+          return;
+        }
+
+        networkMetaEl.textContent = `Mode: LAN (same Wi-Fi) | ${lanHint}`;
+      }
+
       function updateBridgeCommand() {
         const code = sessionCode || "------";
         const virtualDevice = virtualDeviceSelect.value || "xbox";
+        const serverOrigin = getActiveServerOrigin() || window.location.origin;
         bridgeSetupCommandEl.textContent = "npm run bridge:install";
-        bridgeCommandEl.textContent = `npm run bridge:virtual -- --server ${window.location.origin} --code ${code} --device ${virtualDevice}`;
-        keyboardBridgeCommandEl.textContent = `npm run bridge -- --server ${window.location.origin} --code ${code}`;
+        bridgeCommandEl.textContent = `npm run bridge:virtual -- --server ${serverOrigin} --code ${code} --device ${virtualDevice}`;
+        keyboardBridgeCommandEl.textContent = `npm run bridge -- --server ${serverOrigin} --code ${code}`;
+      }
+
+      function refreshJoinLinkDisplay() {
+        if (!sessionCode) {
+          urlEl.textContent = "Generating session link...";
+          qrcodeEl.innerHTML = "";
+          renderNetworkMeta();
+          updateBridgeCommand();
+          return;
+        }
+
+        const joinUrl = buildJoinUrl(sessionCode);
+        urlEl.textContent = joinUrl;
+
+        qrcodeEl.innerHTML = "";
+        QRCode.toCanvas(joinUrl, { width: 170, margin: 1 }, (err, canvas) => {
+          if (!err) {
+            qrcodeEl.appendChild(canvas);
+          }
+        });
+
+        renderNetworkMeta();
+        updateBridgeCommand();
       }
 
       function syncConfigSelects() {
@@ -593,18 +742,7 @@
       function setCode(code) {
         sessionCode = code;
         codeEl.textContent = code;
-
-        const joinUrl = `${window.location.origin}/controller?code=${encodeURIComponent(code)}`;
-        urlEl.textContent = joinUrl;
-
-        qrcodeEl.innerHTML = "";
-        QRCode.toCanvas(joinUrl, { width: 170, margin: 1 }, (err, canvas) => {
-          if (!err) {
-            qrcodeEl.appendChild(canvas);
-          }
-        });
-
-        updateBridgeCommand();
+        refreshJoinLinkDisplay();
       }
 
       function moveStickDot(node, stick) {
@@ -957,12 +1095,75 @@
         setEditorStatus(`Deleted ${profileId}.`);
       }
 
+      function loadStoredNetworkState() {
+        const storedMode = localStorage.getItem(NETWORK_STORAGE_KEYS.mode);
+        if (storedMode === "relay" || storedMode === "lan") {
+          networkState.mode = storedMode;
+        }
+
+        networkState.lanOrigin = normalizeOrigin(localStorage.getItem(NETWORK_STORAGE_KEYS.lanOrigin));
+        networkState.relayOrigin = normalizeOrigin(localStorage.getItem(NETWORK_STORAGE_KEYS.relayOrigin));
+      }
+
+      async function loadNetworkDefaults() {
+        try {
+          const response = await fetch("/api/network");
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
+
+          const payload = await response.json();
+          const serverOrigin = normalizeOrigin(payload.serverOrigin);
+          const recommendedLanOrigin = normalizeOrigin(payload.recommendedLanOrigin);
+          const relayDefaultOrigin = normalizeOrigin(payload.relayDefaultOrigin);
+          const lanOrigins = Array.isArray(payload.lanOrigins)
+            ? payload.lanOrigins.map((entry) => normalizeOrigin(entry)).filter(Boolean)
+            : [];
+
+          if (serverOrigin) {
+            networkState.serverOrigin = serverOrigin;
+          }
+          networkState.lanOrigins = lanOrigins;
+
+          if (!networkState.lanOrigin) {
+            networkState.lanOrigin = recommendedLanOrigin || lanOrigins[0] || networkState.serverOrigin;
+          }
+
+          if (!networkState.relayOrigin && relayDefaultOrigin) {
+            networkState.relayOrigin = relayDefaultOrigin;
+          }
+        } catch (error) {
+          appendLog(`Network defaults unavailable: ${error.message}`);
+        }
+
+        syncNetworkInputs();
+        persistNetworkState();
+        refreshJoinLinkDisplay();
+      }
+
+      function commitNetworkInputs() {
+        const nextLanOrigin = normalizeOrigin(lanOriginInput.value);
+        const nextRelayOrigin = normalizeOrigin(relayOriginInput.value);
+        if (lanOriginInput.value.trim() && !nextLanOrigin) {
+          appendLog("Invalid LAN URL. Use format like 192.168.1.20:3000");
+        }
+        if (relayOriginInput.value.trim() && !nextRelayOrigin) {
+          appendLog("Invalid Relay URL. Use format like https://relay.example.com");
+        }
+
+        networkState.lanOrigin = nextLanOrigin;
+        networkState.relayOrigin = nextRelayOrigin;
+        syncNetworkInputs();
+        persistNetworkState();
+        refreshJoinLinkDisplay();
+      }
+
       document.getElementById("copyBtn").addEventListener("click", async () => {
         if (!sessionCode) {
           return;
         }
 
-        const link = `${window.location.origin}/controller?code=${encodeURIComponent(sessionCode)}`;
+        const link = buildJoinUrl(sessionCode);
 
         try {
           await navigator.clipboard.writeText(link);
@@ -977,6 +1178,15 @@
       gameProfileSelect.addEventListener("change", updateConfig);
       layoutSelect.addEventListener("change", updateConfig);
       virtualDeviceSelect.addEventListener("change", updateBridgeCommand);
+      networkModeSelect.addEventListener("change", () => {
+        networkState.mode = networkModeSelect.value === "relay" ? "relay" : "lan";
+        persistNetworkState();
+        refreshJoinLinkDisplay();
+      });
+      lanOriginInput.addEventListener("change", commitNetworkInputs);
+      relayOriginInput.addEventListener("change", commitNetworkInputs);
+      lanOriginInput.addEventListener("blur", commitNetworkInputs);
+      relayOriginInput.addEventListener("blur", commitNetworkInputs);
 
       profileEditorToggle.addEventListener("click", () => {
         editorOpen = !editorOpen;
@@ -1064,7 +1274,10 @@
         appendLog("Session closed.");
       });
 
-      updateBridgeCommand();
+      loadStoredNetworkState();
+      syncNetworkInputs();
+      refreshJoinLinkDisplay();
+      loadNetworkDefaults();
       loadEditorPayload()
         .then(() => {
           maybeCreateSession();

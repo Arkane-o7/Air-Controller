@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: air-controller-relay
+    env: node
+    buildCommand: npm ci --omit=dev
+    startCommand: npm start
+    autoDeploy: true
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: AIR_PUBLIC_RELAY_ORIGIN
+        sync: false

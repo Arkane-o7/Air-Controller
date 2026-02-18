@@ -26,6 +26,46 @@ Open:
 - Host: `http://localhost:3000/host`
 - Phone controller: `http://<host-lan-ip>:3000/controller`
 
+### Connection methods in Host UI
+
+Host page now supports two modes:
+
+- `LAN (Same Wi-Fi)`: phone and PC stay on the same local network. Use this for lowest latency.
+- `Public Relay (Cloud)`: phone can connect from any network using a public URL.
+
+Host reads `/api/network` for defaults and can preload relay URL from:
+
+```bash
+AIR_PUBLIC_RELAY_ORIGIN=https://your-public-domain.example.com
+```
+
+Bridge commands shown on host now use the currently selected mode URL.
+
+### Deploy Public Relay on Render
+
+This repo includes `/render.yaml` for a Render Web Service deploy.
+
+1. Push this repo to GitHub.
+2. In Render: `New` -> `Blueprint`.
+3. Select this repo and apply the blueprint.
+4. After first deploy, copy your service URL (example: `https://air-controller-relay.onrender.com`).
+5. In Render service env vars, set:
+   - `AIR_PUBLIC_RELAY_ORIGIN=https://<your-render-domain>`
+6. Redeploy once after setting the env var.
+
+Then use in host:
+
+- Open `/host`
+- Select `Public Relay (Cloud)`
+- Ensure relay URL is your Render URL
+- Share generated join link / QR
+
+Bridge example against relay:
+
+```bash
+npm run bridge:virtual -- --server https://<your-render-domain> --code ABC123 --device xbox
+```
+
 ### Virtual bridge from CLI
 
 First-time setup:
@@ -55,6 +95,7 @@ npm run bridge:keyboard -- --server http://localhost:3000 --code ABC123
 ## 2) Desktop app (downloadable PC app)
 
 Desktop app lives in `desktop-app` and embeds the AIR server + bridge launcher.
+It includes the same LAN/Public Relay selector on `/host`.
 
 ### Run desktop app (dev)
 

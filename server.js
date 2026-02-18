@@ -1,5 +1,6 @@
 const path = require("path");
 const http = require("http");
+const os = require("os");
 const express = require("express");
 const { Server } = require("socket.io");
 const {
@@ -95,6 +96,30 @@ function getSessionFromSocket(socket) {
   };
 }
 
+function listLanOrigins(port) {
+  const origins = new Set();
+  const interfaces = os.networkInterfaces();
+
+  Object.values(interfaces).forEach((group) => {
+    (group || []).forEach((entry) => {
+      if (!entry || entry.internal || entry.family !== "IPv4") {
+        return;
+      }
+
+      origins.add(`http://${entry.address}:${port}`);
+    });
+  });
+
+  return Array.from(origins);
+}
+
+function resolveRequestOrigin(req, fallbackPort) {
+  const forwardedProto = String(req.get("x-forwarded-proto") || "").split(",")[0].trim();
+  const protocol = forwardedProto || req.protocol || "http";
+  const hostHeader = req.get("host") || `localhost:${fallbackPort}`;
+  return `${protocol}://${hostHeader}`.replace(/\/+$/, "");
+}
+
 app.use(express.static(path.join(__dirname, "public")));
 app.use(express.json({ limit: "1mb" }));
 
@@ -116,6 +141,35 @@ app.get("/api/profiles", (_req, res) => {
 
 app.get("/api/profiles/editor", (_req, res) => {
   res.json(getProfileEditorPayload());
+});
+
+app.get("/healthz", (_req, res) => {
+  res.status(200).send("ok");
+});
+
+app.get("/api/network", (req, res) => {
+  const requestPort = Number(req.socket?.localPort || PORT || 3000);
+  const serverOrigin = resolveRequestOrigin(req, requestPort);
+  const lanOrigins = listLanOrigins(requestPort);
+  const relayDefaultOrigin = String(process.env.AIR_PUBLIC_RELAY_ORIGIN || "")
+    .trim()
+    .replace(/\/+$/, "");
+
+  let recommendedLanOrigin = serverOrigin;
+  const hostLabel = (req.hostname || "").toLowerCase();
+  const isLoopbackHost =
+    hostLabel === "localhost" || hostLabel === "127.0.0.1" || hostLabel === "::1";
+
+  if (isLoopbackHost && lanOrigins.length > 0) {
+    recommendedLanOrigin = lanOrigins[0];
+  }
+
+  res.json({
+    serverOrigin,
+    lanOrigins,
+    recommendedLanOrigin,
+    relayDefaultOrigin,
+  });
 });
 
 app.post("/api/profiles/game", (req, res) => {
