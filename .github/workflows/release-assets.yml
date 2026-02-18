@@ -142,13 +142,23 @@ jobs:
         run: npx expo prebuild --platform android --non-interactive --clean
         working-directory: mobile-app
 
-      - name: Build debug APK
-        run: ./gradlew assembleDebug --no-daemon
+      - name: Build signed release APK
+        run: |
+          ./gradlew assembleRelease --no-daemon \
+            -Pandroid.injected.signing.store.file="$HOME/.android/debug.keystore" \
+            -Pandroid.injected.signing.store.password=android \
+            -Pandroid.injected.signing.key.alias=androiddebugkey \
+            -Pandroid.injected.signing.key.password=android
         working-directory: mobile-app/android
 
       - name: Rename APK
         run: |
-          cp mobile-app/android/app/build/outputs/apk/debug/app-debug.apk mobile-app/android/app/build/outputs/apk/debug/AIR-Controller-android-debug.apk
+          RELEASE_DIR="mobile-app/android/app/build/outputs/apk/release"
+          APK_SOURCE=$(find "$RELEASE_DIR" -type f -name "*.apk" | grep -v "unsigned" | head -n 1 || true)
+          if [ -z "$APK_SOURCE" ]; then
+            APK_SOURCE=$(find "$RELEASE_DIR" -type f -name "*.apk" | head -n 1)
+          fi
+          cp "$APK_SOURCE" "$RELEASE_DIR/AIR-Controller-android-release.apk"
 
       - name: Upload APK to release
         uses: softprops/action-gh-release@v2
@@ -156,6 +166,6 @@ jobs:
           tag_name: ${{ steps.meta.outputs.tag }}
           fail_on_unmatched_files: false
           files: |
-            mobile-app/android/app/build/outputs/apk/debug/AIR-Controller-android-debug.apk
+            mobile-app/android/app/build/outputs/apk/release/AIR-Controller-android-release.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
