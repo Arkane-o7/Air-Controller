@@ -1004,6 +1004,31 @@ ipcMain.handle("desktop:open-url", async (_event, url) => {
   return { ok: true };
 });
 
+ipcMain.handle("desktop:open-game-controllers", async () => {
+  if (process.platform !== "win32") {
+    return { ok: false, error: "NOT_SUPPORTED", message: "joy.cpl is only available on Windows." };
+  }
+
+  return new Promise((resolve) => {
+    const child = spawn("control.exe", ["joy.cpl"], {
+      windowsHide: true,
+      detached: true,
+      stdio: "ignore",
+    });
+
+    child.once("error", (error) => {
+      resolve({
+        ok: false,
+        error: "OPEN_FAILED",
+        message: error.message || "Failed to open Game Controllers panel.",
+      });
+    });
+
+    child.unref();
+    resolve({ ok: true });
+  });
+});
+
 ipcMain.handle("bridge:install-virtual", async () => {
   const setup = await installVirtualBridge();
   if (!setup.ok) {
@@ -1066,6 +1091,7 @@ ipcMain.handle("bridge:start", async (_event, options = {}) => {
 
   const kind = String(options.type || "virtual").toLowerCase();
   const playerIndex = parsePlayerIndex(options.player);
+  const autoDependencySetup = options.autoDependencySetup !== false;
 
   if (kind === "keyboard") {
     const args = [
@@ -1097,8 +1123,37 @@ ipcMain.handle("bridge:start", async (_event, options = {}) => {
       };
     }
 
+    if (process.platform === "win32" && autoDependencySetup) {
+      const readyNow =
+        virtualBridgeCheckState.status === "ready" && Boolean(virtualBridgeCheckState.devices?.[device]);
+
+      if (!readyNow) {
+        appendBridgeLog("status", `bridge:start: auto-running one-click setup for ${device.toUpperCase()} mode`);
+        const setup = await runDependencySetup({
+          force: true,
+          auto: false,
+          allowDriverInstall: true,
+          openManualFallback: true,
+        });
+
+        if (!setup.ok) {
+          return {
+            ok: false,
+            error: setup.error || "Dependency setup failed.",
+            stage: setup.stage || "setup",
+            requiresRestart: Boolean(setup.requiresRestart),
+            setup,
+            preflight: virtualBridgeCheckState,
+          };
+        }
+      }
+    }
+
     if (process.platform === "win32" || process.platform === "linux") {
-      const check = await checkVirtualBridgeReadiness({ force: false, autoSetup: true });
+      const check = await checkVirtualBridgeReadiness({
+        force: process.platform === "win32" && autoDependencySetup,
+        autoSetup: !(process.platform === "win32" && autoDependencySetup),
+      });
       if (check.status !== "ready" || !check.devices?.[device]) {
         return {
           ok: false,

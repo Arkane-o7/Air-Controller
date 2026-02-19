@@ -244,6 +244,7 @@
           <div class="row">
             <button id="openHostBtn" type="button">Open Host Dashboard</button>
             <button id="openBrowserBtn" class="subtle" type="button">Open Host In Browser</button>
+            <button id="openGameControllersBtn" class="subtle" type="button">Open Game Controllers (Windows)</button>
           </div>
 
           <div class="url">
@@ -295,6 +296,7 @@
 
           <p id="setupStatus" class="hint">Setup: pending.</p>
           <p id="virtualStatus" class="hint">Virtual preflight: pending.</p>
+          <p id="modeAdvice" class="hint">Compatibility advice will appear here.</p>
           <p id="bridgeHint" class="hint">Bridge idle.</p>
           <div id="bridgeList" class="bridge-list"></div>
         </section>
@@ -311,6 +313,7 @@
         serverStatus: document.getElementById("serverStatus"),
         openHostBtn: document.getElementById("openHostBtn"),
         openBrowserBtn: document.getElementById("openBrowserBtn"),
+        openGameControllersBtn: document.getElementById("openGameControllersBtn"),
         localHostUrl: document.getElementById("localHostUrl"),
         copyHostUrlBtn: document.getElementById("copyHostUrlBtn"),
         lanUrlList: document.getElementById("lanUrlList"),
@@ -326,6 +329,7 @@
         stopBridgeBtn: document.getElementById("stopBridgeBtn"),
         setupStatus: document.getElementById("setupStatus"),
         virtualStatus: document.getElementById("virtualStatus"),
+        modeAdvice: document.getElementById("modeAdvice"),
         bridgeHint: document.getElementById("bridgeHint"),
         bridgeList: document.getElementById("bridgeList"),
         logBox: document.getElementById("logBox"),
@@ -552,11 +556,30 @@
         ui.virtualStatus.textContent = "Virtual preflight: not checked yet.";
       }
 
+      function renderModeAdvice() {
+        const selectedMode = ui.bridgeModeSelect.value;
+        if (selectedMode === "keyboard") {
+          ui.modeAdvice.textContent =
+            "Keyboard mode: most games must run non-admin unless AIR Controller is also started as administrator.";
+          return;
+        }
+
+        if (selectedMode === "ds4") {
+          ui.modeAdvice.textContent =
+            "DS4 mode: if the game does not detect controller, try Xbox mode first. Validate in joy.cpl, then disable Steam Input override for that game if needed. Start Bridge auto-runs setup if required.";
+          return;
+        }
+
+        ui.modeAdvice.textContent =
+          "Xbox mode: best compatibility. If joy.cpl shows input but game does not, restart the game and disable Steam Input per-game override. Start Bridge auto-runs setup if required.";
+      }
+
       function updateStartButtonState() {
         const selectedMode = ui.bridgeModeSelect.value;
         const needsVirtualDriver = selectedMode !== "keyboard" && !ui.dryRunInput.checked;
         const setupRunning = state?.dependencySetup?.status === "running";
         let blockedReason = "";
+        let hintReason = "";
 
         if (setupRunning) {
           blockedReason = "Dependency setup is still running.";
@@ -570,14 +593,15 @@
           if (check?.status === "unsupported") {
             blockedReason = check?.message || "Virtual bridge is not supported on this OS.";
           } else if ((platform === "win32" || platform === "linux") && !ready) {
-            blockedReason =
-              check?.message ||
-              "Virtual bridge preflight not ready. Run Recheck Virtual Driver.";
+            hintReason =
+              platform === "win32"
+                ? "Not ready yet. Start Bridge will run dependency setup automatically."
+                : check?.message || "Virtual bridge preflight not ready yet.";
           }
         }
 
         ui.startBridgeBtn.disabled = Boolean(blockedReason);
-        ui.startBridgeBtn.title = blockedReason;
+        ui.startBridgeBtn.title = blockedReason || hintReason;
       }
 
       async function refreshState() {
@@ -608,6 +632,7 @@
         renderBridgeList(bridges);
         renderSetupStatus(res.dependencySetup);
         renderVirtualStatus(res.virtualBridgeCheck);
+        renderModeAdvice();
         updateStartButtonState();
 
         ui.logBox.innerHTML = "";
@@ -621,6 +646,13 @@
       ui.openBrowserBtn.addEventListener("click", async () => {
         if (state?.localHostUrl) {
           await window.airDesktop.openUrl(state.localHostUrl);
+        }
+      });
+
+      ui.openGameControllersBtn.addEventListener("click", async () => {
+        const res = await window.airDesktop.openGameControllers();
+        if (!res?.ok) {
+          ui.bridgeHint.textContent = res?.message || "Unable to open Game Controllers panel.";
         }
       });
 
@@ -671,6 +703,9 @@
       });
 
       ui.startBridgeBtn.addEventListener("click", async () => {
+        ui.bridgeHint.textContent =
+          "Starting bridge. Dependencies/driver will be prepared automatically if required.";
+
         const code = normalizeCode(ui.sessionCodeInput.value);
 
         if (code.length !== 6) {
@@ -684,6 +719,7 @@
           serverUrl: ui.serverUrlInput.value.trim(),
           player: normalizePlayerIndex(ui.playerIndexInput.value),
           dryRun: ui.dryRunInput.checked,
+          autoDependencySetup: true,
         };
 
         if (selected === "keyboard") {
@@ -707,6 +743,7 @@
       });
 
       ui.bridgeModeSelect.addEventListener("change", updateStartButtonState);
+      ui.bridgeModeSelect.addEventListener("change", renderModeAdvice);
       ui.dryRunInput.addEventListener("change", updateStartButtonState);
       ui.serverUrlInput.addEventListener("input", () => {
         serverUrlWasEdited = true;

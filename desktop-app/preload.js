@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld("airDesktop", {
   getState: () => ipcRenderer.invoke("desktop:get-state"),
   openHostWindow: () => ipcRenderer.invoke("desktop:open-host-window"),
   openUrl: (url) => ipcRenderer.invoke("desktop:open-url", url),
+  openGameControllers: () => ipcRenderer.invoke("desktop:open-game-controllers"),
   runDependencySetup: (options) => ipcRenderer.invoke("bridge:setup-all", options || {}),
   installVirtualBridge: () => ipcRenderer.invoke("bridge:install-virtual"),
   checkVirtualBridge: (options) => ipcRenderer.invoke("bridge:check-virtual", options || {}),
