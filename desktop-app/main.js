@@ -244,7 +244,9 @@ async function connectDesktopHostSocket() {
         });
 
         try {
-          desktopHostSocket.connect();
+          if (!desktopHostSocket.connected && !desktopHostSocket.active) {
+            desktopHostSocket.connect();
+          }
         } catch (error) {
           clearTimeout(timeout);
           finishReject(error);
@@ -274,14 +276,29 @@ async function connectDesktopHostSocket() {
       reconnection: true,
       timeout: 8000,
     });
+    desktopHostSocket = socket;
 
     let settled = false;
+    const timeout = setTimeout(() => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      setDesktopSessionState({
+        status: "error",
+        hostConnected: false,
+        lastError: "Timed out connecting session host channel.",
+      });
+      emitSessionStateEvent("connect_timeout");
+      reject(new Error("Timed out connecting session host channel."));
+    }, 10000);
 
     const resolveOnce = () => {
       if (settled) {
         return;
       }
       settled = true;
+      clearTimeout(timeout);
       resolve(socket);
     };
 
@@ -290,6 +307,7 @@ async function connectDesktopHostSocket() {
         return;
       }
       settled = true;
+      clearTimeout(timeout);
       reject(error);
     };
 
@@ -322,7 +340,9 @@ async function connectDesktopHostSocket() {
       });
       emitSessionStateEvent("connect_error");
       appendBridgeLog("error", `session: ${message}`);
-      rejectOnce(new Error(message));
+      if (!socket.connected && !socket.active) {
+        rejectOnce(new Error(message));
+      }
     });
 
     socket.on("disconnect", (reason) => {
@@ -424,7 +444,19 @@ async function ensureDesktopSession(options = {}) {
     }
   }
 
-  await connectDesktopHostSocket();
+  try {
+    await connectDesktopHostSocket();
+  } catch (error) {
+    const message = error?.message || "SESSION_HOST_CONNECT_FAILED";
+    setDesktopSessionState({
+      status: "error",
+      hostConnected: false,
+      lastError: message,
+    });
+    emitSessionStateEvent("ensure_connect_failed");
+    appendBridgeLog("error", `session: ${message}`);
+    return { ok: false, error: message, session: desktopSessionState };
+  }
 
   if (!desktopHostSocket || !desktopHostSocket.connected) {
     const message = "Session host channel is offline.";
