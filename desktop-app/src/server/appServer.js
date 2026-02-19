@@ -47,6 +47,47 @@ function createAirServer(options = {}) {
       .slice(0, 6);
   }
 
+  function parsePlayerIndex(value) {
+    const parsed = Number(value);
+    if (!Number.isFinite(parsed)) {
+      return null;
+    }
+
+    const integer = Math.floor(parsed);
+    if (integer < 1 || integer > 64) {
+      return null;
+    }
+
+    return integer;
+  }
+
+  function reserveControllerPlayerIndex(session, requestedPlayer) {
+    const used = new Set();
+
+    session.controllers.forEach((entry) => {
+      if (entry?.playerIndex) {
+        used.add(entry.playerIndex);
+      }
+    });
+
+    const requestedIndex = parsePlayerIndex(requestedPlayer);
+    if (requestedIndex && !used.has(requestedIndex)) {
+      return requestedIndex;
+    }
+
+    for (let candidate = 1; candidate <= 64; candidate += 1) {
+      if (!used.has(candidate)) {
+        return candidate;
+      }
+    }
+
+    return null;
+  }
+
+  function resolveBridgePlayerIndex(value) {
+    return parsePlayerIndex(value) || 1;
+  }
+
   function buildConfigPayload(code, config) {
     return {
       code,
@@ -102,6 +143,74 @@ function createAirServer(options = {}) {
       code,
       session: sessions.get(code),
     };
+  }
+
+  function maybeCleanupStaleSession(code, session) {
+    if (
+      session &&
+      session.controllers.size === 0 &&
+      session.bridges.size === 0 &&
+      Date.now() - session.createdAt > 1000 * 60 * 20
+    ) {
+      sessions.delete(code);
+    }
+  }
+
+  function emitControllerDisconnected(session, socket, fallbackPlayerIndex = null) {
+    const controllerState = session.controllers.get(socket.id) || null;
+    session.controllers.delete(socket.id);
+    io.to(session.hostSocketId).emit("session:controller-disconnected", {
+      controllerId: socket.id,
+      playerIndex: controllerState?.playerIndex || fallbackPlayerIndex || null,
+      count: session.controllers.size,
+    });
+  }
+
+  function emitBridgeDisconnected(session, socket, fallbackName = "Bridge", fallbackPlayerIndex = 1) {
+    const bridgeState = session.bridges.get(socket.id) || null;
+    session.bridges.delete(socket.id);
+    io.to(session.hostSocketId).emit("session:bridge-disconnected", {
+      bridgeId: socket.id,
+      name: bridgeState?.name || fallbackName || "Bridge",
+      playerIndex: bridgeState?.playerIndex || fallbackPlayerIndex || 1,
+      count: session.bridges.size,
+    });
+  }
+
+  function detachSocketFromPreviousSession(socket, nextRole, nextCode) {
+    const previousRole = socket.data.role;
+    const previousCode = normalizeCode(socket.data.sessionCode);
+
+    if (!previousRole || !previousCode) {
+      return;
+    }
+
+    if (previousRole === nextRole && previousCode === nextCode) {
+      return;
+    }
+
+    const previousSession = sessions.get(previousCode);
+
+    if (previousRole === "host") {
+      closeSession(previousCode, "host_reassigned");
+    } else if (previousRole === "controller" && previousSession) {
+      emitControllerDisconnected(previousSession, socket, socket.data.playerIndex || null);
+      maybeCleanupStaleSession(previousCode, previousSession);
+    } else if (previousRole === "bridge" && previousSession) {
+      emitBridgeDisconnected(
+        previousSession,
+        socket,
+        socket.data.bridgeName || "Bridge",
+        socket.data.playerIndex || 1
+      );
+      maybeCleanupStaleSession(previousCode, previousSession);
+    }
+
+    socket.leave(`session:${previousCode}`);
+    delete socket.data.role;
+    delete socket.data.sessionCode;
+    delete socket.data.playerIndex;
+    delete socket.data.bridgeName;
   }
 
   function listLanOrigins(portValue) {
@@ -214,19 +323,15 @@ function createAirServer(options = {}) {
 
   io.on("connection", (socket) => {
     socket.on("host:create-session", (payload = {}, ack = () => {}) => {
-      const previous = getSessionFromSocket(socket);
-
-      if (socket.data.role === "host" && previous.session) {
-        closeSession(previous.code, "host_new_session");
-      }
+      detachSocketFromPreviousSession(socket, "host", "");
 
       const code = createSessionCode();
       const config = resolveSessionConfig(payload.config || payload);
 
       sessions.set(code, {
         hostSocketId: socket.id,
-        controllers: new Set(),
-        bridges: new Set(),
+        controllers: new Map(),
+        bridges: new Map(),
         createdAt: Date.now(),
         config,
       });
@@ -265,17 +370,30 @@ function createAirServer(options = {}) {
         return;
       }
 
-      session.controllers.add(socket.id);
+      detachSocketFromPreviousSession(socket, "controller", code);
+
+      const playerIndex = reserveControllerPlayerIndex(session, payload.player);
+      if (!playerIndex) {
+        ack({ ok: false, error: "CONTROLLER_SLOTS_FULL", maxControllers: 64 });
+        return;
+      }
+
+      session.controllers.set(socket.id, {
+        playerIndex,
+        joinedAt: Date.now(),
+      });
       socket.join(`session:${code}`);
       socket.data.role = "controller";
       socket.data.sessionCode = code;
+      socket.data.playerIndex = playerIndex;
 
       io.to(session.hostSocketId).emit("session:controller-connected", {
         controllerId: socket.id,
+        playerIndex,
         count: session.controllers.size,
       });
 
-      ack({ ok: true, ...buildConfigPayload(code, session.config) });
+      ack({ ok: true, playerIndex, ...buildConfigPayload(code, session.config) });
     });
 
     socket.on("bridge:join-session", (payload = {}, ack = () => {}) => {
@@ -287,19 +405,30 @@ function createAirServer(options = {}) {
         return;
       }
 
-      session.bridges.add(socket.id);
+      detachSocketFromPreviousSession(socket, "bridge", code);
+
+      const playerIndex = resolveBridgePlayerIndex(payload.player);
+      const bridgeName = String(payload.name || "Bridge").slice(0, 40);
+
+      session.bridges.set(socket.id, {
+        name: bridgeName,
+        playerIndex,
+        joinedAt: Date.now(),
+      });
       socket.join(`session:${code}`);
       socket.data.role = "bridge";
       socket.data.sessionCode = code;
-      socket.data.bridgeName = String(payload.name || "Bridge").slice(0, 40);
+      socket.data.bridgeName = bridgeName;
+      socket.data.playerIndex = playerIndex;
 
       io.to(session.hostSocketId).emit("session:bridge-connected", {
         bridgeId: socket.id,
-        name: socket.data.bridgeName,
+        name: bridgeName,
+        playerIndex,
         count: session.bridges.size,
       });
 
-      ack({ ok: true, ...buildConfigPayload(code, session.config) });
+      ack({ ok: true, playerIndex, ...buildConfigPayload(code, session.config) });
     });
 
     socket.on("controller:input", (payload = {}) => {
@@ -309,15 +438,25 @@ function createAirServer(options = {}) {
         return;
       }
 
+      const controllerState = session.controllers.get(socket.id);
+      if (!controllerState) {
+        return;
+      }
+
       const event = {
         controllerId: socket.id,
+        playerIndex: controllerState.playerIndex || 1,
         at: Date.now(),
         payload,
       };
 
       io.to(session.hostSocketId).emit("session:input", event);
 
-      session.bridges.forEach((bridgeId) => {
+      session.bridges.forEach((bridgeState, bridgeId) => {
+        if ((bridgeState?.playerIndex || 1) !== event.playerIndex) {
+          return;
+        }
+
         io.to(bridgeId).emit("session:input", event);
       });
     });
@@ -335,29 +474,19 @@ function createAirServer(options = {}) {
       }
 
       if (socket.data.role === "controller") {
-        session.controllers.delete(socket.id);
-        io.to(session.hostSocketId).emit("session:controller-disconnected", {
-          controllerId: socket.id,
-          count: session.controllers.size,
-        });
+        emitControllerDisconnected(session, socket, socket.data.playerIndex || null);
       }
 
       if (socket.data.role === "bridge") {
-        session.bridges.delete(socket.id);
-        io.to(session.hostSocketId).emit("session:bridge-disconnected", {
-          bridgeId: socket.id,
-          name: socket.data.bridgeName || "Bridge",
-          count: session.bridges.size,
-        });
+        emitBridgeDisconnected(
+          session,
+          socket,
+          socket.data.bridgeName || "Bridge",
+          socket.data.playerIndex || 1
+        );
       }
 
-      if (
-        session.controllers.size === 0 &&
-        session.bridges.size === 0 &&
-        Date.now() - session.createdAt > 1000 * 60 * 20
-      ) {
-        sessions.delete(code);
-      }
+      maybeCleanupStaleSession(code, session);
     });
   });
 

@@ -198,6 +198,28 @@
         gap: 0.5rem;
       }
 
+      .bridge-list {
+        margin-top: 0.5rem;
+        display: grid;
+        gap: 0.4rem;
+      }
+
+      .bridge-item {
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 10px;
+        background: rgba(255, 255, 255, 0.05);
+        padding: 0.45rem 0.55rem;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .bridge-item code {
+        font-size: 0.78rem;
+        word-break: break-all;
+      }
+
       @media (max-width: 960px) {
         main {
           grid-template-columns: 1fr;
@@ -251,6 +273,11 @@
               Server URL for bridge
               <input id="serverUrlInput" placeholder="http://127.0.0.1:3000" />
             </label>
+
+            <label>
+              Player
+              <input id="playerIndexInput" value="1" inputmode="numeric" />
+            </label>
           </div>
 
           <label>
@@ -259,12 +286,17 @@
           </label>
 
           <div class="row" style="margin-top: 0.6rem;">
+            <button id="runSetupBtn" type="button">Run One-Click Setup</button>
             <button id="installBridgeBtn" class="subtle" type="button">Install Virtual Bridge Runtime</button>
+            <button id="checkVirtualBtn" class="subtle" type="button">Recheck Virtual Driver</button>
             <button id="startBridgeBtn" type="button">Start Bridge</button>
             <button id="stopBridgeBtn" class="warn" type="button">Stop Bridge</button>
           </div>
 
+          <p id="setupStatus" class="hint">Setup: pending.</p>
+          <p id="virtualStatus" class="hint">Virtual preflight: pending.</p>
           <p id="bridgeHint" class="hint">Bridge idle.</p>
+          <div id="bridgeList" class="bridge-list"></div>
         </section>
 
         <section class="card">
@@ -285,15 +317,24 @@
         sessionCodeInput: document.getElementById("sessionCodeInput"),
         bridgeModeSelect: document.getElementById("bridgeModeSelect"),
         serverUrlInput: document.getElementById("serverUrlInput"),
+        playerIndexInput: document.getElementById("playerIndexInput"),
         dryRunInput: document.getElementById("dryRunInput"),
+        runSetupBtn: document.getElementById("runSetupBtn"),
         installBridgeBtn: document.getElementById("installBridgeBtn"),
+        checkVirtualBtn: document.getElementById("checkVirtualBtn"),
         startBridgeBtn: document.getElementById("startBridgeBtn"),
         stopBridgeBtn: document.getElementById("stopBridgeBtn"),
+        setupStatus: document.getElementById("setupStatus"),
+        virtualStatus: document.getElementById("virtualStatus"),
         bridgeHint: document.getElementById("bridgeHint"),
+        bridgeList: document.getElementById("bridgeList"),
         logBox: document.getElementById("logBox"),
       };
 
       let state = null;
+      let autoServerUrl = "";
+      let serverUrlWasEdited = false;
+      let setupAutoTriggered = false;
 
       function normalizeCode(raw) {
         return String(raw || "")
@@ -310,9 +351,28 @@
         const line = document.createElement("div");
         line.className = `log-line ${entry.type || "stdout"}`;
         const timestamp = new Date(entry.at || Date.now()).toLocaleTimeString();
-        line.textContent = `[${timestamp}] ${entry.message}`;
+        const bridgePrefix = entry.bridgeId ? `[${entry.bridgeId}] ` : "";
+        line.textContent = `[${timestamp}] ${bridgePrefix}${entry.message}`;
         ui.logBox.appendChild(line);
         ui.logBox.scrollTop = ui.logBox.scrollHeight;
+      }
+
+      function normalizePlayerIndex(raw) {
+        const parsed = Number(raw);
+        if (!Number.isFinite(parsed)) {
+          return 1;
+        }
+
+        const integer = Math.floor(parsed);
+        if (integer < 1) {
+          return 1;
+        }
+
+        if (integer > 64) {
+          return 64;
+        }
+
+        return integer;
       }
 
       function renderLanUrls(urls) {
@@ -366,16 +426,158 @@
         }
       }
 
-      function renderBridgeState(bridge) {
-        if (bridge.running) {
-          const startedAt = bridge.startedAt ? new Date(bridge.startedAt).toLocaleTimeString() : "-";
-          ui.bridgeHint.textContent = `Bridge running: ${bridge.type || "unknown"} (since ${startedAt})`;
-        } else {
+      function renderBridgeState(bridges) {
+        if (bridges.length === 0) {
           ui.bridgeHint.textContent = "Bridge idle.";
+        } else {
+          const labels = bridges
+            .map((entry) => `${entry.id} ${entry.type || "bridge"} P${entry.playerIndex || "?"}`)
+            .join(" | ");
+          ui.bridgeHint.textContent = `Running bridges: ${bridges.length} (${labels})`;
         }
 
-        ui.startBridgeBtn.disabled = bridge.running;
-        ui.stopBridgeBtn.disabled = !bridge.running;
+        ui.stopBridgeBtn.disabled = bridges.length === 0;
+      }
+
+      function renderBridgeList(bridges) {
+        ui.bridgeList.innerHTML = "";
+
+        if (bridges.length === 0) {
+          return;
+        }
+
+        bridges.forEach((entry) => {
+          const row = document.createElement("div");
+          row.className = "bridge-item";
+
+          const label = document.createElement("code");
+          const startedAt = entry.startedAt ? new Date(entry.startedAt).toLocaleTimeString() : "--";
+          label.textContent = `${entry.id} | ${entry.type || "bridge"} | P${entry.playerIndex || "?"} | ${startedAt}`;
+
+          const stopBtn = document.createElement("button");
+          stopBtn.type = "button";
+          stopBtn.className = "warn";
+          stopBtn.textContent = "Stop";
+          stopBtn.addEventListener("click", async () => {
+            await window.airDesktop.stopBridge({ bridgeId: entry.id });
+            await refreshState();
+          });
+
+          row.appendChild(label);
+          row.appendChild(stopBtn);
+          ui.bridgeList.appendChild(row);
+        });
+      }
+
+      function getSelectedVirtualDevice() {
+        return ui.bridgeModeSelect.value === "ds4" ? "ds4" : "xbox";
+      }
+
+      function renderSetupStatus(setup) {
+        if (!setup) {
+          ui.runSetupBtn.disabled = false;
+          ui.runSetupBtn.textContent = "Run One-Click Setup";
+          ui.setupStatus.textContent = "Setup: unavailable.";
+          return;
+        }
+
+        if (setup.status === "running") {
+          ui.runSetupBtn.disabled = true;
+          ui.runSetupBtn.textContent = "Setup Running...";
+          ui.setupStatus.textContent = `Setup: running. ${setup.message || "Working..."}`;
+          return;
+        }
+
+        ui.runSetupBtn.disabled = false;
+        ui.runSetupBtn.textContent = "Run One-Click Setup";
+
+        if (setup.status === "success") {
+          ui.setupStatus.textContent = `Setup: complete. ${setup.message || ""}`;
+          return;
+        }
+
+        if (setup.status === "pending_restart") {
+          ui.setupStatus.textContent = `Setup: restart required. ${setup.message || ""}`;
+          return;
+        }
+
+        if (setup.status === "failed") {
+          ui.setupStatus.textContent = `Setup: failed. ${setup.message || "Review logs and retry."}`;
+          return;
+        }
+
+        ui.setupStatus.textContent = `Setup: ${setup.message || "Not started."}`;
+      }
+
+      function renderVirtualStatus(check) {
+        if (!check) {
+          ui.virtualStatus.textContent = "Virtual preflight: unavailable.";
+          return;
+        }
+
+        const checkedAt = check.checkedAt ? new Date(check.checkedAt).toLocaleTimeString() : "--";
+
+        if (check.status === "not_required") {
+          ui.virtualStatus.textContent = "Virtual preflight: not required on this OS.";
+          return;
+        }
+
+        if (check.status === "unsupported") {
+          ui.virtualStatus.textContent = `Virtual preflight: unsupported. ${check.message || ""}`;
+          return;
+        }
+
+        if (check.status === "checking") {
+          ui.virtualStatus.textContent = "Virtual preflight: checking runtime and driver...";
+          return;
+        }
+
+        if (check.status === "ready") {
+          const supported = [];
+          if (check.devices?.xbox) {
+            supported.push("Xbox");
+          }
+          if (check.devices?.ds4) {
+            supported.push("DS4");
+          }
+          ui.virtualStatus.textContent = `Virtual preflight: ready (${supported.join(", ")}) at ${checkedAt}.`;
+          return;
+        }
+
+        if (check.status === "failed") {
+          ui.virtualStatus.textContent = `Virtual preflight: failed. ${check.message || "Check ViGEmBus driver."}`;
+          return;
+        }
+
+        ui.virtualStatus.textContent = "Virtual preflight: not checked yet.";
+      }
+
+      function updateStartButtonState() {
+        const selectedMode = ui.bridgeModeSelect.value;
+        const needsVirtualDriver = selectedMode !== "keyboard" && !ui.dryRunInput.checked;
+        const setupRunning = state?.dependencySetup?.status === "running";
+        let blockedReason = "";
+
+        if (setupRunning) {
+          blockedReason = "Dependency setup is still running.";
+        } else if (needsVirtualDriver) {
+          const check = state?.virtualBridgeCheck;
+          const device = getSelectedVirtualDevice();
+          const deviceReady = Boolean(check?.devices?.[device]);
+          const ready = check?.status === "ready" && deviceReady;
+          const platform = check?.platform;
+
+          if (check?.status === "unsupported") {
+            blockedReason = check?.message || "Virtual bridge is not supported on this OS.";
+          } else if ((platform === "win32" || platform === "linux") && !ready) {
+            blockedReason =
+              check?.message ||
+              "Virtual bridge preflight not ready. Run Recheck Virtual Driver.";
+          }
+        }
+
+        ui.startBridgeBtn.disabled = Boolean(blockedReason);
+        ui.startBridgeBtn.title = blockedReason;
       }
 
       async function refreshState() {
@@ -391,10 +593,22 @@
         ui.serverStatus.classList.add("online");
 
         ui.localHostUrl.textContent = res.localHostUrl;
-        ui.serverUrlInput.value = res.localOrigin;
+
+        const currentServerUrl = ui.serverUrlInput.value.trim();
+        const shouldAutoSyncServerUrl =
+          !serverUrlWasEdited || !currentServerUrl || currentServerUrl === autoServerUrl;
+        if (shouldAutoSyncServerUrl) {
+          ui.serverUrlInput.value = res.localOrigin;
+          autoServerUrl = res.localOrigin;
+        }
 
         renderLanUrls(res.lanControllerUrls || []);
-        renderBridgeState(res.bridge || { running: false });
+        const bridges = Array.isArray(res.bridges) ? res.bridges : [];
+        renderBridgeState(bridges);
+        renderBridgeList(bridges);
+        renderSetupStatus(res.dependencySetup);
+        renderVirtualStatus(res.virtualBridgeCheck);
+        updateStartButtonState();
 
         ui.logBox.innerHTML = "";
         (res.bridge?.logs || []).forEach(appendLog);
@@ -422,6 +636,38 @@
         ui.bridgeHint.textContent = res.ok
           ? "Virtual bridge runtime ready."
           : `Install failed: ${res.error || "Unknown error"}`;
+        await refreshState();
+      });
+
+      ui.checkVirtualBtn.addEventListener("click", async () => {
+        ui.bridgeHint.textContent = "Checking virtual driver...";
+        const res = await window.airDesktop.checkVirtualBridge({ force: true, autoSetup: true });
+        if (!res?.ok) {
+          ui.bridgeHint.textContent = `Virtual check failed: ${res?.check?.message || "Unknown error"}`;
+        } else {
+          ui.bridgeHint.textContent = "Virtual check passed.";
+        }
+        await refreshState();
+      });
+
+      ui.runSetupBtn.addEventListener("click", async () => {
+        ui.bridgeHint.textContent = "Running one-click dependency setup...";
+        const res = await window.airDesktop.runDependencySetup({
+          force: true,
+          auto: false,
+          allowDriverInstall: true,
+          openManualFallback: true,
+        });
+
+        if (res?.ok) {
+          ui.bridgeHint.textContent = res?.requiresRestart
+            ? "Setup completed. Restart Windows if virtual device is still unavailable."
+            : "Setup completed successfully.";
+        } else {
+          ui.bridgeHint.textContent = `Setup failed: ${res?.error || "Unknown error"}`;
+        }
+
+        await refreshState();
       });
 
       ui.startBridgeBtn.addEventListener("click", async () => {
@@ -436,6 +682,7 @@
         const payload = {
           code,
           serverUrl: ui.serverUrlInput.value.trim(),
+          player: normalizePlayerIndex(ui.playerIndexInput.value),
           dryRun: ui.dryRunInput.checked,
         };
 
@@ -455,8 +702,17 @@
       });
 
       ui.stopBridgeBtn.addEventListener("click", async () => {
-        await window.airDesktop.stopBridge();
+        await window.airDesktop.stopBridge({});
         await refreshState();
+      });
+
+      ui.bridgeModeSelect.addEventListener("change", updateStartButtonState);
+      ui.dryRunInput.addEventListener("change", updateStartButtonState);
+      ui.serverUrlInput.addEventListener("input", () => {
+        serverUrlWasEdited = true;
+      });
+      ui.playerIndexInput.addEventListener("input", () => {
+        ui.playerIndexInput.value = String(normalizePlayerIndex(ui.playerIndexInput.value));
       });
 
       window.airDesktop.onBridgeEvent((event) => {
@@ -467,7 +723,22 @@
         }
       });
 
-      refreshState();
+      refreshState().then(async () => {
+        if (
+          !setupAutoTriggered &&
+          state?.virtualBridgeCheck?.platform === "win32" &&
+          state?.dependencySetup?.status === "idle"
+        ) {
+          setupAutoTriggered = true;
+          await window.airDesktop.runDependencySetup({
+            force: false,
+            auto: true,
+            allowDriverInstall: true,
+            openManualFallback: false,
+          });
+          await refreshState();
+        }
+      });
     </script>
   </body>
 </html>

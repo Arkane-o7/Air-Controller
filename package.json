@@ -1,6 +1,6 @@
 {
   "name": "air-controller",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Use a phone as a game controller for another device over local network",
   "main": "server.js",
   "scripts": {
@@ -10,6 +10,7 @@
     "bridge:keyboard": "node bridge/keyboard-bridge.js",
     "bridge:virtual": "node bridge/run-virtual-bridge.js",
     "bridge:install": "node bridge/run-virtual-bridge.js --setup-only",
+    "test:session-membership": "node scripts/session-membership-regression.js",
     "desktop:dev": "npm --prefix desktop-app run dev",
     "desktop:build:win": "npm --prefix desktop-app run build:win",
     "desktop:build:linux": "npm --prefix desktop-app run build:linux",

@@ -48,6 +48,11 @@ def parse_args() -> argparse.Namespace:
         help="Bridge label shown in host UI",
     )
     parser.add_argument(
+        "--player",
+        default=os.getenv("AIR_CONTROLLER_PLAYER", "1"),
+        help="Player slot to listen for (default: 1)",
+    )
+    parser.add_argument(
         "--dry-run",
         action="store_true",
         default=os.getenv("AIR_CONTROLLER_DRY_RUN", "0") == "1",
@@ -59,6 +64,18 @@ def parse_args() -> argparse.Namespace:
 def normalize_session_code(raw: str) -> str:
     cleaned = "".join(ch for ch in str(raw or "").upper().strip() if ch.isalnum())
     return cleaned[:6]
+
+
+def normalize_player_index(raw: object, fallback: int = 1) -> int:
+    try:
+        parsed = int(float(str(raw or fallback).strip()))
+    except (TypeError, ValueError):
+        return fallback
+
+    if parsed < 1 or parsed > 64:
+        return fallback
+
+    return parsed
 
 
 def clamp(value: float, lo: float, hi: float) -> float:
@@ -385,6 +402,7 @@ class BridgeRuntime:
         server_url: str,
         session_code: str,
         bridge_name: str,
+        player_index: int,
         default_profile_id: str,
         profile_maps: Dict[str, Dict[str, List[str]]],
         profile_locked: bool,
@@ -394,6 +412,7 @@ class BridgeRuntime:
         self.server_url = server_url
         self.session_code = session_code
         self.bridge_name = bridge_name
+        self.player_index = normalize_player_index(player_index, 1)
         self.profile_maps = profile_maps
         self.profile_locked = profile_locked
         self.default_profile_id = default_profile_id
@@ -434,6 +453,7 @@ class BridgeRuntime:
                 {
                     "code": self.session_code,
                     "name": self.bridge_name,
+                    "player": self.player_index,
                 },
                 callback=self._handle_join_ack,
             )
@@ -446,6 +466,10 @@ class BridgeRuntime:
 
         @self.client.on("session:input")
         def on_session_input(event):
+            event_player = normalize_player_index((event or {}).get("playerIndex"), 1)
+            if event_player != self.player_index:
+                return
+
             payload = (event or {}).get("payload") or {}
             with self.lock:
                 virtual_map = self.profile_maps.get(self.active_profile_id, {})
@@ -480,13 +504,18 @@ class BridgeRuntime:
 
         self._ingest_profile_payload(response.get("profile") or {})
 
+        assigned_player = normalize_player_index((response or {}).get("playerIndex"), self.player_index)
+        if assigned_player != self.player_index:
+            self.player_index = assigned_player
+            log(f"[virtual-bridge] player -> {self.player_index} (session assignment)")
+
         if not self.profile_locked:
             config = response.get("config") or {}
             requested = config.get("gameProfileId")
             if requested:
                 self._set_active_profile(requested, "session config")
 
-        log(f"[virtual-bridge] joined session {self.session_code}")
+        log(f"[virtual-bridge] joined session {self.session_code} as P{self.player_index}")
 
     def connect_and_wait(self) -> None:
         self.client.connect(self.server_url, transports=["websocket", "polling"])
@@ -520,6 +549,7 @@ def main() -> int:
     profile_maps = build_profile_maps(catalog)
     default_profile_id = str((catalog.get("defaults") or {}).get("gameProfileId", "platformer"))
     profile_id = resolve_profile_id(args.profile, profile_maps, default_profile_id)
+    player_index = normalize_player_index(args.player, 1)
 
     if not profile_maps:
         log("Error: no virtual profiles available in config/profiles.json")
@@ -563,6 +593,7 @@ def main() -> int:
         server_url=args.server,
         session_code=session_code,
         bridge_name=bridge_name,
+        player_index=player_index,
         default_profile_id=profile_id,
         profile_maps=profile_maps,
         profile_locked=bool(args.profile),
@@ -570,6 +601,7 @@ def main() -> int:
 
     log(f"[virtual-bridge] server: {args.server}")
     log(f"[virtual-bridge] session: {session_code}")
+    log(f"[virtual-bridge] player: {player_index}")
     log(f"[virtual-bridge] device: {args.device}")
     log(f"[virtual-bridge] mode: {'dry-run' if args.dry_run else 'virtual-device'}")
     log(f"[virtual-bridge] profile: {profile_id}{' (locked)' if args.profile else ''}")

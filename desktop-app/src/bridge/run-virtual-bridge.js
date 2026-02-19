@@ -82,18 +82,41 @@ function ensureVenv(systemPython) {
   return venvPython;
 }
 
+function runtimeDependenciesHealthy(venvPython) {
+  const validationLines = ["import socketio"];
+
+  if (isWindows || process.platform === "linux") {
+    validationLines.push("import vgamepad");
+  }
+
+  const probe = spawnSync(venvPython, ["-c", validationLines.join("\n")], {
+    stdio: "ignore",
+  });
+
+  return !probe.error && probe.status === 0;
+}
+
 function ensureRequirementsInstalled(venvPython) {
   const stampPath = path.join(venvDir, ".requirements-installed");
 
   const requirementsMtime = fs.statSync(requirementsPath).mtimeMs;
   const stampMtime = fs.existsSync(stampPath) ? fs.statSync(stampPath).mtimeMs : 0;
 
-  if (stampMtime >= requirementsMtime) {
+  if (stampMtime >= requirementsMtime && runtimeDependenciesHealthy(venvPython)) {
     return;
+  }
+
+  if (stampMtime >= requirementsMtime) {
+    console.log("[bridge:virtual] Dependency validation failed; reinstalling bridge requirements...");
   }
 
   console.log("[bridge:virtual] Installing Python bridge dependencies...");
   runOrThrow(venvPython, ["-m", "pip", "install", "-r", requirementsPath]);
+
+  if (!runtimeDependenciesHealthy(venvPython)) {
+    throw new Error("Python bridge dependencies failed validation after install.");
+  }
+
   fs.writeFileSync(stampPath, `${new Date().toISOString()}\n`, "utf8");
 }
 

@@ -407,10 +407,10 @@
           <div class="bridge-command" id="bridgeSetupCommand">npm run bridge:install</div>
 
           <div class="bridge-note">Run virtual gamepad bridge (Windows/Linux):</div>
-          <div class="bridge-command" id="bridgeCommand">npm run bridge:virtual -- --server http://localhost:3000 --code ------ --device xbox</div>
+          <div class="bridge-command" id="bridgeCommand">npm run bridge:virtual -- --server http://localhost:3000 --code ------ --device xbox --player 1</div>
 
           <div class="bridge-note">Keyboard bridge fallback:</div>
-          <div class="bridge-command" id="keyboardBridgeCommand">npm run bridge -- --server http://localhost:3000 --code ------</div>
+          <div class="bridge-command" id="keyboardBridgeCommand">npm run bridge -- --server http://localhost:3000 --code ------ --player 1</div>
 
           <button id="profileEditorToggle" type="button" class="subtle editor-toggle">Open Profile Editor</button>
 
@@ -702,8 +702,8 @@
         const virtualDevice = virtualDeviceSelect.value || "xbox";
         const serverOrigin = getActiveServerOrigin() || window.location.origin;
         bridgeSetupCommandEl.textContent = "npm run bridge:install";
-        bridgeCommandEl.textContent = `npm run bridge:virtual -- --server ${serverOrigin} --code ${code} --device ${virtualDevice}`;
-        keyboardBridgeCommandEl.textContent = `npm run bridge -- --server ${serverOrigin} --code ${code}`;
+        bridgeCommandEl.textContent = `npm run bridge:virtual -- --server ${serverOrigin} --code ${code} --device ${virtualDevice} --player 1`;
+        keyboardBridgeCommandEl.textContent = `npm run bridge -- --server ${serverOrigin} --code ${code} --player 1`;
       }
 
       function refreshJoinLinkDisplay() {
@@ -719,11 +719,17 @@
         urlEl.textContent = joinUrl;
 
         qrcodeEl.innerHTML = "";
-        QRCode.toCanvas(joinUrl, { width: 170, margin: 1 }, (err, canvas) => {
-          if (!err) {
-            qrcodeEl.appendChild(canvas);
-          }
-        });
+        if (window.QRCode && typeof QRCode.toCanvas === "function") {
+          QRCode.toCanvas(joinUrl, { width: 170, margin: 1 }, (err, canvas) => {
+            if (!err) {
+              qrcodeEl.appendChild(canvas);
+            }
+          });
+        } else {
+          const note = document.createElement("small");
+          note.textContent = "QR unavailable (offline). Use the join URL above.";
+          qrcodeEl.appendChild(note);
+        }
 
         renderNetworkMeta();
         updateBridgeCommand();
@@ -1230,22 +1236,22 @@
 
       socket.on("session:controller-connected", (info) => {
         setConnectedCount(info.count || connectedControllers + 1);
-        appendLog(`Controller connected (${info.controllerId.slice(0, 5)}).`);
+        appendLog(`Controller connected P${info.playerIndex || "?"} (${info.controllerId.slice(0, 5)}).`);
       });
 
       socket.on("session:controller-disconnected", (info) => {
         setConnectedCount(info.count || Math.max(0, connectedControllers - 1));
-        appendLog("Controller disconnected.");
+        appendLog(`Controller disconnected P${info.playerIndex || "?"}.`);
       });
 
       socket.on("session:bridge-connected", (info) => {
         setBridgeCount(info.count || connectedBridges + 1);
-        appendLog(`Bridge connected (${info.name || "Bridge"}).`);
+        appendLog(`Bridge connected (${info.name || "Bridge"} -> P${info.playerIndex || "?"}).`);
       });
 
       socket.on("session:bridge-disconnected", (info) => {
         setBridgeCount(info.count || Math.max(0, connectedBridges - 1));
-        appendLog(`Bridge disconnected (${info.name || "Bridge"}).`);
+        appendLog(`Bridge disconnected (${info.name || "Bridge"} -> P${info.playerIndex || "?"}).`);
       });
 
       socket.on("session:config-updated", ({ config }) => {
@@ -1258,13 +1264,13 @@
         renderConfigMeta();
       });
 
-      socket.on("session:input", ({ controllerId, at, payload }) => {
+      socket.on("session:input", ({ controllerId, playerIndex, at, payload }) => {
         applyInput(payload || {});
         const age = Math.max(0, Date.now() - (at || Date.now()));
         latencyEl.textContent = `Last update: ${age}ms`;
 
         if (payload?.event) {
-          appendLog(`${controllerId.slice(0, 4)} -> ${payload.event}`);
+          appendLog(`P${playerIndex || "?"} ${controllerId.slice(0, 4)} -> ${payload.event}`);
         }
       });
 

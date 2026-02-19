@@ -33,6 +33,7 @@ function parseArgs(argv) {
     server: process.env.AIR_CONTROLLER_SERVER || "http://localhost:3000",
     code: process.env.AIR_CONTROLLER_CODE || "",
     profile: process.env.AIR_CONTROLLER_PROFILE || "",
+    player: process.env.AIR_CONTROLLER_PLAYER || "1",
     name: process.env.AIR_CONTROLLER_BRIDGE_NAME || "Keyboard Bridge",
     dryRun: process.env.AIR_CONTROLLER_DRY_RUN === "1",
     help: false,
@@ -69,6 +70,12 @@ function parseArgs(argv) {
       continue;
     }
 
+    if (current === "--player") {
+      options.player = argv[i + 1] || options.player;
+      i += 1;
+      continue;
+    }
+
     if (current === "--name") {
       options.name = argv[i + 1] || options.name;
       i += 1;
@@ -82,6 +89,14 @@ function parseArgs(argv) {
     .replace(/[^A-Z0-9]/g, "")
     .slice(0, 6);
 
+  const playerValue = Number(options.player);
+  if (Number.isFinite(playerValue)) {
+    const normalizedPlayer = Math.floor(playerValue);
+    options.player = normalizedPlayer >= 1 && normalizedPlayer <= 64 ? normalizedPlayer : 1;
+  } else {
+    options.player = 1;
+  }
+
   return options;
 }
 
@@ -91,6 +106,7 @@ function printUsage() {
   console.log("Options:");
   console.log("  --server <url>      AIR Controller server URL (default: http://localhost:3000)");
   console.log("  --profile <id>      Lock to a game profile ID (platformer, racing, arena)");
+  console.log("  --player <index>    Player slot to listen for (default: 1)");
   console.log("  --name <label>      Bridge label shown on host dashboard");
   console.log("  --dry-run           Print key transitions without injecting OS keys");
   console.log("  -h, --help          Show this help message");
@@ -142,6 +158,7 @@ let activeProfile = getGameProfile(options.profile || "platformer") || {
 let profileLocked = Boolean(options.profile);
 let pressedTokens = new Set();
 let actionQueue = Promise.resolve();
+let activePlayerIndex = options.player;
 
 function profileSummary(profile) {
   return `${profile.name || profile.id} (${profile.id})`;
@@ -262,6 +279,7 @@ const socket = io(options.server, {
 
 console.log(`[bridge] server: ${options.server}`);
 console.log(`[bridge] session: ${options.code}`);
+console.log(`[bridge] player: ${activePlayerIndex}`);
 console.log(`[bridge] mode: ${options.dryRun ? "dry-run" : "keyboard injection"}`);
 
 socket.on("connect", () => {
@@ -269,6 +287,7 @@ socket.on("connect", () => {
     "bridge:join-session",
     {
       code: options.code,
+      player: activePlayerIndex,
       name: options.name,
     },
     (res) => {
@@ -283,12 +302,22 @@ socket.on("connect", () => {
         setActiveProfile(activeProfile.id, profileLocked ? "cli override" : "default", res.profile);
       }
 
-      console.log("[bridge] connected and listening for controller input");
+      const assignedPlayer = Number(res?.playerIndex);
+      if (Number.isFinite(assignedPlayer) && assignedPlayer >= 1 && assignedPlayer <= 64) {
+        activePlayerIndex = Math.floor(assignedPlayer);
+      }
+
+      console.log(`[bridge] connected and listening for controller input (P${activePlayerIndex})`);
     }
   );
 });
 
-socket.on("session:input", ({ payload }) => {
+socket.on("session:input", ({ payload, playerIndex }) => {
+  const incomingPlayer = Number(playerIndex || 1);
+  if (incomingPlayer !== activePlayerIndex) {
+    return;
+  }
+
   queueKeySync(payload || {});
 });
 

@@ -360,6 +360,7 @@
       const state = {
         connected: false,
         code: "",
+        playerIndex: null,
         buttons: Object.fromEntries(BUTTON_IDS.map((id) => [id, false])),
         leftStick: { x: 0, y: 0 },
         rightStick: { x: 0, y: 0 },
@@ -484,18 +485,23 @@
           return;
         }
 
-        socket.emit("controller:join-session", { code }, (res) => {
+        socket.emit("controller:join-session", { code, player: state.playerIndex }, (res) => {
           if (!res?.ok) {
             setConnected(false);
-            log("Session not found. Check code and retry.");
+            if (res?.error === "CONTROLLER_SLOTS_FULL") {
+              log(`Session full (${res.maxControllers || 64} controllers). Disconnect one and retry.`);
+            } else {
+              log("Session not found. Check code and retry.");
+            }
             return;
           }
 
           state.code = code;
+          state.playerIndex = Number(res.playerIndex || state.playerIndex || 1);
           codeInput.value = code;
           applyConfig(res.config || {});
           setConnected(true);
-          log(`Connected to ${code}.`);
+          log(`Connected to ${code} as P${state.playerIndex}.`);
           sendInput("connected");
         });
       }
@@ -541,14 +547,6 @@
           }
         }
       }
-
-      function updateAxisDpad(dx, dy) {
-        setButtonSource("left", "left-stick-axis", dx < -0.45, { silent: true });
-        setButtonSource("right", "left-stick-axis", dx > 0.45, { silent: true });
-        setButtonSource("up", "left-stick-axis", dy < -0.45, { silent: true });
-        setButtonSource("down", "left-stick-axis", dy > 0.45, { silent: true });
-      }
-
       function handleStickPointer(which, clientX, clientY) {
         const zone = which === "left" ? leftStickZone : rightStickZone;
         const rect = zone.getBoundingClientRect();
@@ -568,7 +566,6 @@
         if (which === "left") {
           state.leftStick.x = Number(dx.toFixed(3));
           state.leftStick.y = Number(dy.toFixed(3));
-          updateAxisDpad(state.leftStick.x, state.leftStick.y);
         } else {
           state.rightStick.x = Number(dx.toFixed(3));
           state.rightStick.y = Number(dy.toFixed(3));
@@ -582,7 +579,6 @@
         if (which === "left") {
           state.leftStick.x = 0;
           state.leftStick.y = 0;
-          updateAxisDpad(0, 0);
         } else {
           state.rightStick.x = 0;
           state.rightStick.y = 0;
