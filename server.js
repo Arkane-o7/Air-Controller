@@ -448,13 +448,22 @@ io.on("connection", (socket) => {
 
     io.to(session.hostSocketId).emit("session:input", event);
 
+    let matchedBridgeCount = 0;
     session.bridges.forEach((bridgeState, bridgeId) => {
       if ((bridgeState?.playerIndex || 1) !== event.playerIndex) {
         return;
       }
 
+      matchedBridgeCount += 1;
       io.to(bridgeId).emit("session:input", event);
     });
+
+    if (matchedBridgeCount === 0 && session.controllers.size === 1 && session.bridges.size === 1) {
+      const onlyBridgeId = session.bridges.keys().next().value;
+      if (onlyBridgeId) {
+        io.to(onlyBridgeId).emit("session:input", event);
+      }
+    }
   });
 
   socket.on("disconnect", () => {

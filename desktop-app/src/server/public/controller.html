@@ -485,7 +485,8 @@
           return;
         }
 
-        socket.emit("controller:join-session", { code, player: state.playerIndex }, (res) => {
+        const requestedPlayer = state.code && state.code === code ? state.playerIndex : null;
+        socket.emit("controller:join-session", { code, player: requestedPlayer }, (res) => {
           if (!res?.ok) {
             setConnected(false);
             if (res?.error === "CONTROLLER_SLOTS_FULL") {
