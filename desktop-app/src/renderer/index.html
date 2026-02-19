@@ -115,6 +115,60 @@
         font-size: 0.8rem;
       }
 
+      .session-shell {
+        margin-top: 0.6rem;
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 0.8rem;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 12px;
+        background: rgba(255, 255, 255, 0.04);
+        padding: 0.7rem;
+      }
+
+      .session-label {
+        font-size: 0.74rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        opacity: 0.82;
+      }
+
+      .session-code {
+        margin-top: 0.12rem;
+        font-family: "Bebas Neue", cursive;
+        letter-spacing: 0.2em;
+        font-size: clamp(1.5rem, 3vw, 2.3rem);
+        line-height: 1;
+      }
+
+      .session-code.ready {
+        color: #9dfce7;
+      }
+
+      .qr-panel {
+        min-width: 176px;
+        display: grid;
+        justify-items: center;
+        align-content: start;
+        gap: 0.35rem;
+      }
+
+      .qr-box {
+        min-width: 176px;
+        min-height: 176px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        background: rgba(255, 255, 255, 0.07);
+        display: grid;
+        place-items: center;
+        padding: 0.35rem;
+      }
+
+      .qr-box canvas,
+      .qr-box img {
+        border-radius: 8px;
+      }
+
       label {
         display: grid;
         gap: 0.3rem;
@@ -228,6 +282,14 @@
         .grid {
           grid-template-columns: 1fr;
         }
+
+        .session-shell {
+          grid-template-columns: 1fr;
+        }
+
+        .qr-panel {
+          justify-items: start;
+        }
       }
     </style>
   </head>
@@ -242,7 +304,7 @@
         <section class="card">
           <h2>Session Console</h2>
           <div class="row">
-            <button id="openHostBtn" type="button">Open Host Dashboard</button>
+            <button id="openHostBtn" type="button">Advanced Host Dashboard</button>
             <button id="openBrowserBtn" class="subtle" type="button">Open Host In Browser</button>
             <button id="openGameControllersBtn" class="subtle" type="button">Open Game Controllers (Windows)</button>
           </div>
@@ -252,13 +314,25 @@
             <button id="copyHostUrlBtn" class="subtle" type="button">Copy</button>
           </div>
 
-          <p class="hint">Use LAN URLs below in the phone app to open `/controller`.</p>
-          <div id="lanUrlList"></div>
+          <p class="hint">Session is managed automatically. Scan QR or copy an invite link on your phone.</p>
+          <div class="session-shell">
+            <div>
+              <div class="session-label">Active Session</div>
+              <div id="sessionCodeBadge" class="session-code">------</div>
+              <p id="sessionStatusHint" class="hint">Preparing session...</p>
+              <div class="row">
+                <button id="newSessionBtn" class="subtle" type="button">New Code</button>
+                <button id="copyInviteBtn" class="subtle" type="button" disabled>Copy Invite Link</button>
+              </div>
+            </div>
 
-          <label>
-            Session code
-            <input id="sessionCodeInput" maxlength="6" placeholder="ABC123" />
-          </label>
+            <div class="qr-panel">
+              <div id="sessionQrBox" class="qr-box"></div>
+              <p id="sessionQrHint" class="hint">QR will appear when session is ready.</p>
+            </div>
+          </div>
+
+          <div id="inviteUrlList"></div>
 
           <div class="grid">
             <label>
@@ -290,7 +364,7 @@
             <button id="runSetupBtn" type="button">Run One-Click Setup</button>
             <button id="installBridgeBtn" class="subtle" type="button">Install Virtual Bridge Runtime</button>
             <button id="checkVirtualBtn" class="subtle" type="button">Recheck Virtual Driver</button>
-            <button id="startBridgeBtn" type="button">Start Bridge</button>
+            <button id="startBridgeBtn" type="button">Start Playing</button>
             <button id="stopBridgeBtn" class="warn" type="button">Stop Bridge</button>
           </div>
 
@@ -308,6 +382,7 @@
       </main>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/qrcode/build/qrcode.min.js"></script>
     <script>
       const ui = {
         serverStatus: document.getElementById("serverStatus"),
@@ -316,8 +391,13 @@
         openGameControllersBtn: document.getElementById("openGameControllersBtn"),
         localHostUrl: document.getElementById("localHostUrl"),
         copyHostUrlBtn: document.getElementById("copyHostUrlBtn"),
-        lanUrlList: document.getElementById("lanUrlList"),
-        sessionCodeInput: document.getElementById("sessionCodeInput"),
+        inviteUrlList: document.getElementById("inviteUrlList"),
+        sessionCodeBadge: document.getElementById("sessionCodeBadge"),
+        sessionStatusHint: document.getElementById("sessionStatusHint"),
+        newSessionBtn: document.getElementById("newSessionBtn"),
+        copyInviteBtn: document.getElementById("copyInviteBtn"),
+        sessionQrBox: document.getElementById("sessionQrBox"),
+        sessionQrHint: document.getElementById("sessionQrHint"),
         bridgeModeSelect: document.getElementById("bridgeModeSelect"),
         serverUrlInput: document.getElementById("serverUrlInput"),
         playerIndexInput: document.getElementById("playerIndexInput"),
@@ -339,6 +419,7 @@
       let autoServerUrl = "";
       let serverUrlWasEdited = false;
       let setupAutoTriggered = false;
+      let lastQrValue = "";
 
       function normalizeCode(raw) {
         return String(raw || "")
@@ -379,14 +460,16 @@
         return integer;
       }
 
-      function renderLanUrls(urls) {
-        ui.lanUrlList.innerHTML = "";
+      function renderInviteUrls(session) {
+        ui.inviteUrlList.innerHTML = "";
+        const code = normalizeCode(session?.code || "");
+        const urls = Array.isArray(session?.joinUrls) ? session.joinUrls : [];
 
-        if (!urls || urls.length === 0) {
+        if (!code || urls.length === 0) {
           const empty = document.createElement("p");
           empty.className = "hint";
-          empty.textContent = "No LAN IPv4 interface detected yet.";
-          ui.lanUrlList.appendChild(empty);
+          empty.textContent = "Invite links will appear once a session is ready.";
+          ui.inviteUrlList.appendChild(empty);
           return;
         }
 
@@ -394,8 +477,8 @@
           const row = document.createElement("div");
           row.className = "url";
 
-          const code = document.createElement("code");
-          code.textContent = url;
+          const codeNode = document.createElement("code");
+          codeNode.textContent = url;
 
           const controls = document.createElement("div");
           controls.className = "row";
@@ -415,11 +498,82 @@
           controls.appendChild(copyButton);
           controls.appendChild(openButton);
 
-          row.appendChild(code);
+          row.appendChild(codeNode);
           row.appendChild(controls);
 
-          ui.lanUrlList.appendChild(row);
+          ui.inviteUrlList.appendChild(row);
         });
+      }
+
+      function renderSessionQr(joinUrl) {
+        if (!joinUrl) {
+          lastQrValue = "";
+          ui.sessionQrBox.innerHTML = "";
+          ui.sessionQrHint.textContent = "QR will appear when session is ready.";
+          return;
+        }
+
+        if (joinUrl === lastQrValue && ui.sessionQrBox.childElementCount > 0) {
+          return;
+        }
+
+        lastQrValue = joinUrl;
+        ui.sessionQrBox.innerHTML = "";
+
+        if (window.QRCode && typeof window.QRCode.toCanvas === "function") {
+          window.QRCode.toCanvas(joinUrl, { width: 168, margin: 1 }, (error, canvas) => {
+            if (error || !canvas) {
+              ui.sessionQrHint.textContent = "QR render failed. Use Copy Invite Link.";
+              return;
+            }
+
+            ui.sessionQrBox.appendChild(canvas);
+            ui.sessionQrHint.textContent = "Scan from your phone to connect instantly.";
+          });
+          return;
+        }
+
+        const fallback = document.createElement("code");
+        fallback.textContent = "QR unavailable";
+        ui.sessionQrBox.appendChild(fallback);
+        ui.sessionQrHint.textContent = "QR library unavailable. Use Copy Invite Link.";
+      }
+
+      function renderSessionState(session) {
+        const code = normalizeCode(session?.code || "");
+        ui.sessionCodeBadge.textContent = code || "------";
+        ui.sessionCodeBadge.classList.toggle("ready", code.length === 6 && session?.status === "ready");
+
+        ui.copyInviteBtn.disabled = !(code.length === 6 && session?.joinUrl);
+
+        if (!session) {
+          ui.sessionStatusHint.textContent = "Preparing session...";
+          renderSessionQr("");
+          return;
+        }
+
+        if (session.status === "ready" && code.length === 6) {
+          const controllers = Number(session.controllerCount || 0);
+          const bridges = Number(session.bridgeCount || 0);
+          ui.sessionStatusHint.textContent = `Ready. ${controllers} phone(s), ${bridges} bridge(s) connected.`;
+          renderSessionQr(session.joinUrl || "");
+          return;
+        }
+
+        if (session.status === "creating" || session.status === "connecting") {
+          ui.sessionStatusHint.textContent = "Creating session...";
+          renderSessionQr("");
+          return;
+        }
+
+        if (session.status === "error") {
+          ui.sessionStatusHint.textContent = `Session error: ${session.lastError || "Unable to create session."}`;
+          renderSessionQr("");
+          return;
+        }
+
+        ui.sessionStatusHint.textContent = "Preparing session...";
+        renderSessionQr(session.joinUrl || "");
       }
 
       async function copyText(text) {
@@ -626,7 +780,8 @@
           autoServerUrl = res.localOrigin;
         }
 
-        renderLanUrls(res.lanControllerUrls || []);
+        renderSessionState(res.session || null);
+        renderInviteUrls(res.session || null);
         const bridges = Array.isArray(res.bridges) ? res.bridges : [];
         renderBridgeState(bridges);
         renderBridgeList(bridges);
@@ -660,6 +815,26 @@
         if (state?.localHostUrl) {
           copyText(state.localHostUrl);
         }
+      });
+
+      ui.newSessionBtn.addEventListener("click", async () => {
+        ui.bridgeHint.textContent = "Creating a new session code...";
+        const res = await window.airDesktop.newSession({ reason: "desktop_new_code" });
+        if (!res?.ok) {
+          ui.bridgeHint.textContent = `Session creation failed: ${res?.error || "Unknown error"}`;
+        } else {
+          ui.bridgeHint.textContent = `New session ready: ${res?.session?.code || "------"}`;
+        }
+        await refreshState();
+      });
+
+      ui.copyInviteBtn.addEventListener("click", () => {
+        const inviteUrl = state?.session?.joinUrl || "";
+        if (!inviteUrl) {
+          ui.bridgeHint.textContent = "Invite link is not ready yet.";
+          return;
+        }
+        copyText(inviteUrl);
       });
 
       ui.installBridgeBtn.addEventListener("click", async () => {
@@ -706,16 +881,9 @@
         ui.bridgeHint.textContent =
           "Starting bridge. Dependencies/driver will be prepared automatically if required.";
 
-        const code = normalizeCode(ui.sessionCodeInput.value);
-
-        if (code.length !== 6) {
-          ui.bridgeHint.textContent = "Session code must be exactly 6 characters.";
-          return;
-        }
-
         const selected = ui.bridgeModeSelect.value;
         const payload = {
-          code,
+          code: normalizeCode(state?.session?.code || ""),
           serverUrl: ui.serverUrlInput.value.trim(),
           player: normalizePlayerIndex(ui.playerIndexInput.value),
           dryRun: ui.dryRunInput.checked,
@@ -756,6 +924,12 @@
         appendLog(event);
 
         if (event.type === "status") {
+          refreshState();
+        }
+      });
+
+      window.airDesktop.onDesktopEvent((event) => {
+        if (event?.type === "session") {
           refreshState();
         }
       });

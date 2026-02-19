@@ -3,6 +3,7 @@ const os = require("os");
 const path = require("path");
 const { spawn } = require("child_process");
 const { app, BrowserWindow, dialog, ipcMain, shell } = require("electron");
+const { io: createSocketClient } = require("socket.io-client");
 const { createAirServer } = require("./src/server/appServer");
 
 const SOURCE_ROOT = path.join(__dirname, "src");
@@ -32,6 +33,10 @@ let networkState = {
   lanControllerUrls: [],
 };
 let virtualBridgeCheckInFlight = null;
+let desktopHostSocket = null;
+let desktopHostSocketInFlight = null;
+let sessionCreateInFlight = null;
+let sessionConfigUpdateInFlight = null;
 
 function buildInitialVirtualBridgeCheckState() {
   if (process.platform === "darwin") {
@@ -76,6 +81,478 @@ let dependencySetupState = {
   message: "Setup not started.",
   lastError: "",
 };
+
+function buildInitialDesktopSessionState() {
+  return {
+    status: "idle",
+    hostConnected: false,
+    code: "",
+    config: null,
+    controllerCount: 0,
+    bridgeCount: 0,
+    joinUrl: "",
+    joinUrls: [],
+    lastError: "",
+    updatedAt: 0,
+  };
+}
+
+let desktopSessionState = buildInitialDesktopSessionState();
+
+function normalizeSessionCode(value) {
+  return String(value || "")
+    .toUpperCase()
+    .replace(/[^A-Z0-9]/g, "")
+    .slice(0, 6);
+}
+
+function buildJoinUrl(baseControllerUrl, code) {
+  const normalizedCode = normalizeSessionCode(code);
+  if (!normalizedCode || !baseControllerUrl) {
+    return "";
+  }
+
+  const separator = baseControllerUrl.includes("?") ? "&" : "?";
+  return `${baseControllerUrl}${separator}code=${encodeURIComponent(normalizedCode)}`;
+}
+
+function buildSessionJoinUrls(code) {
+  const normalizedCode = normalizeSessionCode(code);
+  if (!normalizedCode) {
+    return [];
+  }
+
+  const joinUrls = [];
+  const pushUnique = (url) => {
+    if (!url || joinUrls.includes(url)) {
+      return;
+    }
+    joinUrls.push(url);
+  };
+
+  networkState.lanControllerUrls.forEach((lanUrl) => {
+    pushUnique(buildJoinUrl(lanUrl, normalizedCode));
+  });
+
+  pushUnique(buildJoinUrl(networkState.localControllerUrl, normalizedCode));
+  return joinUrls;
+}
+
+function setDesktopSessionState(nextState = {}) {
+  const merged = {
+    ...desktopSessionState,
+    ...nextState,
+  };
+
+  const code = normalizeSessionCode(merged.code);
+  const joinUrls = buildSessionJoinUrls(code);
+
+  desktopSessionState = {
+    ...merged,
+    code,
+    joinUrls,
+    joinUrl: joinUrls[0] || "",
+    updatedAt: Date.now(),
+  };
+}
+
+function emitDesktopEvent(event) {
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    mainWindow.webContents.send("desktop:event", event);
+  }
+}
+
+function emitSessionStateEvent(reason) {
+  emitDesktopEvent({
+    type: "session",
+    reason: reason || "",
+    session: desktopSessionState,
+    at: Date.now(),
+  });
+}
+
+function emitSocketAck(socket, eventName, payload = {}, timeoutMs = 10000) {
+  return new Promise((resolve) => {
+    let settled = false;
+
+    const timer = setTimeout(() => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      resolve({ ok: false, error: "ACK_TIMEOUT" });
+    }, timeoutMs);
+
+    try {
+      socket.emit(eventName, payload, (response = {}) => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        clearTimeout(timer);
+        resolve(response);
+      });
+    } catch (error) {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      clearTimeout(timer);
+      resolve({ ok: false, error: error.message || "EMIT_FAILED" });
+    }
+  });
+}
+
+async function connectDesktopHostSocket() {
+  if (desktopHostSocket && desktopHostSocket.connected) {
+    return desktopHostSocket;
+  }
+
+  if (desktopHostSocket) {
+    if (!desktopHostSocketInFlight) {
+      desktopHostSocketInFlight = new Promise((resolve, reject) => {
+        let settled = false;
+
+        const finishResolve = () => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          resolve(desktopHostSocket);
+        };
+
+        const finishReject = (error) => {
+          if (settled) {
+            return;
+          }
+          settled = true;
+          reject(error);
+        };
+
+        const timeout = setTimeout(() => {
+          finishReject(new Error("Timed out reconnecting session host channel."));
+        }, 10000);
+
+        desktopHostSocket.once("connect", () => {
+          clearTimeout(timeout);
+          finishResolve();
+        });
+
+        desktopHostSocket.once("connect_error", (error) => {
+          clearTimeout(timeout);
+          finishReject(error || new Error("Failed reconnecting session host channel."));
+        });
+
+        try {
+          desktopHostSocket.connect();
+        } catch (error) {
+          clearTimeout(timeout);
+          finishReject(error);
+        }
+      }).finally(() => {
+        desktopHostSocketInFlight = null;
+      });
+    }
+
+    return desktopHostSocketInFlight;
+  }
+
+  if (desktopHostSocketInFlight) {
+    return desktopHostSocketInFlight;
+  }
+
+  setDesktopSessionState({
+    status: "connecting",
+    hostConnected: false,
+    lastError: "",
+  });
+  emitSessionStateEvent("connecting");
+
+  desktopHostSocketInFlight = new Promise((resolve, reject) => {
+    const socket = createSocketClient(networkState.localOrigin, {
+      transports: ["websocket", "polling"],
+      reconnection: true,
+      timeout: 8000,
+    });
+
+    let settled = false;
+
+    const resolveOnce = () => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      resolve(socket);
+    };
+
+    const rejectOnce = (error) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      reject(error);
+    };
+
+    socket.on("connect", () => {
+      desktopHostSocket = socket;
+      setDesktopSessionState({
+        hostConnected: true,
+        status: desktopSessionState.code ? desktopSessionState.status : "connecting",
+        lastError: "",
+      });
+      appendBridgeLog("status", "session: host channel connected");
+      emitSessionStateEvent("connected");
+      resolveOnce();
+
+      ensureDesktopSession({ forceNew: false, reason: "socket-connected" }).catch((error) => {
+        appendBridgeLog("error", `session: ${error.message || "failed to recover session"}`);
+      });
+    });
+
+    socket.on("connect_error", (error) => {
+      const message = error?.message || "Unable to connect session host channel.";
+      setDesktopSessionState({
+        status: "error",
+        hostConnected: false,
+        code: "",
+        config: null,
+        controllerCount: 0,
+        bridgeCount: 0,
+        lastError: message,
+      });
+      emitSessionStateEvent("connect_error");
+      appendBridgeLog("error", `session: ${message}`);
+      rejectOnce(new Error(message));
+    });
+
+    socket.on("disconnect", (reason) => {
+      setDesktopSessionState({
+        status: "connecting",
+        hostConnected: false,
+        code: "",
+        config: null,
+        controllerCount: 0,
+        bridgeCount: 0,
+        lastError: `Disconnected (${reason || "unknown"})`,
+      });
+      emitSessionStateEvent("disconnected");
+      appendBridgeLog("status", `session: host channel disconnected (${reason || "unknown"})`);
+    });
+
+    socket.on("session:controller-connected", (info = {}) => {
+      const nextCount = Number.isFinite(Number(info.count))
+        ? Number(info.count)
+        : desktopSessionState.controllerCount + 1;
+      setDesktopSessionState({ controllerCount: Math.max(0, nextCount) });
+      emitSessionStateEvent("controller_connected");
+      appendBridgeLog("status", `session: controller connected P${info.playerIndex || "?"}`);
+    });
+
+    socket.on("session:controller-disconnected", (info = {}) => {
+      const nextCount = Number.isFinite(Number(info.count))
+        ? Number(info.count)
+        : Math.max(0, desktopSessionState.controllerCount - 1);
+      setDesktopSessionState({ controllerCount: Math.max(0, nextCount) });
+      emitSessionStateEvent("controller_disconnected");
+      appendBridgeLog("status", `session: controller disconnected P${info.playerIndex || "?"}`);
+    });
+
+    socket.on("session:bridge-connected", (info = {}) => {
+      const nextCount = Number.isFinite(Number(info.count))
+        ? Number(info.count)
+        : desktopSessionState.bridgeCount + 1;
+      setDesktopSessionState({ bridgeCount: Math.max(0, nextCount) });
+      emitSessionStateEvent("bridge_connected");
+      appendBridgeLog("status", `session: bridge connected P${info.playerIndex || "?"}`);
+    });
+
+    socket.on("session:bridge-disconnected", (info = {}) => {
+      const nextCount = Number.isFinite(Number(info.count))
+        ? Number(info.count)
+        : Math.max(0, desktopSessionState.bridgeCount - 1);
+      setDesktopSessionState({ bridgeCount: Math.max(0, nextCount) });
+      emitSessionStateEvent("bridge_disconnected");
+      appendBridgeLog("status", `session: bridge disconnected P${info.playerIndex || "?"}`);
+    });
+
+    socket.on("session:config-updated", (payload = {}) => {
+      const normalizedCode = normalizeSessionCode(payload.code || desktopSessionState.code);
+      setDesktopSessionState({
+        status: normalizedCode ? "ready" : desktopSessionState.status,
+        code: normalizedCode,
+        config: payload.config || desktopSessionState.config || null,
+      });
+      emitSessionStateEvent("config_updated");
+    });
+
+    socket.on("session:closed", (payload = {}) => {
+      const reason = payload.reason || "closed";
+      appendBridgeLog("status", `session: closed (${reason})`);
+      setDesktopSessionState({
+        status: "connecting",
+        code: "",
+        config: null,
+        controllerCount: 0,
+        bridgeCount: 0,
+        lastError: "",
+      });
+      emitSessionStateEvent("closed");
+
+      ensureDesktopSession({ forceNew: true, reason: "session_closed" }).catch((error) => {
+        appendBridgeLog("error", `session: failed to recreate after close (${error.message})`);
+      });
+    });
+  }).finally(() => {
+    desktopHostSocketInFlight = null;
+  });
+
+  return desktopHostSocketInFlight;
+}
+
+async function ensureDesktopSession(options = {}) {
+  const forceNew = Boolean(options.forceNew);
+  const reason = String(options.reason || (forceNew ? "manual" : "auto"));
+
+  if (!forceNew && desktopSessionState.code.length === 6 && desktopSessionState.status === "ready") {
+    return { ok: true, session: desktopSessionState };
+  }
+
+  if (sessionCreateInFlight) {
+    const inFlightResult = await sessionCreateInFlight;
+    if (!forceNew) {
+      return inFlightResult;
+    }
+  }
+
+  await connectDesktopHostSocket();
+
+  if (!desktopHostSocket || !desktopHostSocket.connected) {
+    const message = "Session host channel is offline.";
+    setDesktopSessionState({
+      status: "error",
+      lastError: message,
+    });
+    emitSessionStateEvent("offline");
+    return { ok: false, error: message, session: desktopSessionState };
+  }
+
+  if (sessionCreateInFlight && !forceNew) {
+    return sessionCreateInFlight;
+  }
+
+  const createPromise = (async () => {
+    setDesktopSessionState({
+      status: "creating",
+      lastError: "",
+      controllerCount: forceNew ? 0 : desktopSessionState.controllerCount,
+      bridgeCount: forceNew ? 0 : desktopSessionState.bridgeCount,
+    });
+    emitSessionStateEvent("creating");
+
+    const response = await emitSocketAck(
+      desktopHostSocket,
+      "host:create-session",
+      { config: options.config || desktopSessionState.config || {} },
+      10000
+    );
+
+    if (!response?.ok) {
+      const message = response?.error || "SESSION_CREATE_FAILED";
+      setDesktopSessionState({
+        status: "error",
+        code: "",
+        config: null,
+        controllerCount: 0,
+        bridgeCount: 0,
+        lastError: message,
+      });
+      emitSessionStateEvent("create_failed");
+      appendBridgeLog("error", `session: create failed (${message})`);
+      return { ok: false, error: message, session: desktopSessionState };
+    }
+
+    setDesktopSessionState({
+      status: "ready",
+      code: response.code || "",
+      config: response.config || desktopSessionState.config || null,
+      controllerCount: 0,
+      bridgeCount: 0,
+      lastError: "",
+    });
+    emitSessionStateEvent("ready");
+    appendBridgeLog("status", `session: ready ${desktopSessionState.code} (${reason})`);
+    return { ok: true, session: desktopSessionState };
+  })();
+
+  sessionCreateInFlight = createPromise;
+  try {
+    return await createPromise;
+  } finally {
+    if (sessionCreateInFlight === createPromise) {
+      sessionCreateInFlight = null;
+    }
+  }
+}
+
+async function updateDesktopSessionConfig(config = {}) {
+  if (sessionConfigUpdateInFlight) {
+    return sessionConfigUpdateInFlight;
+  }
+
+  sessionConfigUpdateInFlight = (async () => {
+    const ensured = await ensureDesktopSession({
+      forceNew: false,
+      reason: "config_update",
+    });
+
+    if (!ensured.ok) {
+      return ensured;
+    }
+
+    if (!desktopHostSocket || !desktopHostSocket.connected) {
+      const message = "Session host channel is offline.";
+      setDesktopSessionState({
+        status: "error",
+        lastError: message,
+      });
+      emitSessionStateEvent("config_update_offline");
+      return { ok: false, error: message, session: desktopSessionState };
+    }
+
+    const response = await emitSocketAck(
+      desktopHostSocket,
+      "host:update-config",
+      { config: config || {} },
+      10000
+    );
+
+    if (!response?.ok) {
+      const message = response?.error || "SESSION_CONFIG_UPDATE_FAILED";
+      setDesktopSessionState({
+        lastError: message,
+      });
+      emitSessionStateEvent("config_update_failed");
+      appendBridgeLog("error", `session: config update failed (${message})`);
+      return { ok: false, error: message, session: desktopSessionState };
+    }
+
+    setDesktopSessionState({
+      status: "ready",
+      code: response.code || desktopSessionState.code,
+      config: response.config || desktopSessionState.config || null,
+      lastError: "",
+    });
+    emitSessionStateEvent("config_updated");
+    appendBridgeLog("status", "session: config updated");
+    return { ok: true, session: desktopSessionState };
+  })();
+
+  try {
+    return await sessionConfigUpdateInFlight;
+  } finally {
+    sessionConfigUpdateInFlight = null;
+  }
+}
 
 function copyFile(sourcePath, targetPath, overwrite = true) {
   if (!overwrite && fs.existsSync(targetPath)) {
@@ -953,6 +1430,9 @@ async function startServer() {
     localControllerUrl: `${localOrigin}/controller`,
     lanControllerUrls: getLanControllerUrls(port),
   };
+
+  setDesktopSessionState({ code: desktopSessionState.code });
+  emitSessionStateEvent("network_updated");
 }
 
 function createMainWindow() {
@@ -985,6 +1465,7 @@ ipcMain.handle("desktop:get-state", async () => {
     ...networkState,
     bridge: summarizeBridgeState(bridges),
     bridges,
+    session: desktopSessionState,
     virtualBridgeCheck: virtualBridgeCheckState,
     dependencySetup: dependencySetupState,
   };
@@ -1027,6 +1508,34 @@ ipcMain.handle("desktop:open-game-controllers", async () => {
     child.unref();
     resolve({ ok: true });
   });
+});
+
+ipcMain.handle("session:get", async () => {
+  return {
+    ok: true,
+    session: desktopSessionState,
+  };
+});
+
+ipcMain.handle("session:new", async (_event, options = {}) => {
+  const result = await ensureDesktopSession({
+    forceNew: true,
+    reason: String(options.reason || "manual"),
+    config: options.config || desktopSessionState.config || {},
+  });
+
+  return {
+    ...result,
+    session: desktopSessionState,
+  };
+});
+
+ipcMain.handle("session:update-config", async (_event, options = {}) => {
+  const result = await updateDesktopSessionConfig(options.config || {});
+  return {
+    ...result,
+    session: desktopSessionState,
+  };
 });
 
 ipcMain.handle("bridge:install-virtual", async () => {
@@ -1075,13 +1584,34 @@ ipcMain.handle("bridge:start", async (_event, options = {}) => {
     await dependencySetupInFlight;
   }
 
-  const code = String(options.code || "")
+  let code = String(options.code || "")
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, "")
     .slice(0, 6);
 
   if (code.length !== 6) {
-    return { ok: false, error: "SESSION_CODE_MUST_BE_6_CHARS" };
+    code = normalizeSessionCode(desktopSessionState.code);
+  }
+
+  if (code.length !== 6) {
+    const ensured = await ensureDesktopSession({
+      forceNew: false,
+      reason: "bridge_start",
+    });
+
+    if (!ensured.ok) {
+      return {
+        ok: false,
+        error: ensured.error || "SESSION_UNAVAILABLE",
+        session: desktopSessionState,
+      };
+    }
+
+    code = normalizeSessionCode(ensured.session?.code);
+  }
+
+  if (code.length !== 6) {
+    return { ok: false, error: "SESSION_CODE_MUST_BE_6_CHARS", session: desktopSessionState };
   }
 
   const serverUrl = String(options.serverUrl || networkState.localOrigin || "").trim();
@@ -1194,6 +1724,12 @@ app.whenReady().then(async () => {
   try {
     prepareRuntimeAssets();
     await startServer();
+    await ensureDesktopSession({
+      forceNew: true,
+      reason: "app_start",
+    }).catch((error) => {
+      appendBridgeLog("error", `session: failed to initialize (${error.message || "unknown"})`);
+    });
     createMainWindow();
     runDependencySetup({
       auto: true,
@@ -1231,6 +1767,15 @@ app.on("before-quit", async (event) => {
 
   try {
     await killBridgeProcess();
+    if (desktopHostSocket) {
+      try {
+        desktopHostSocket.disconnect();
+      } catch (_error) {
+        // no-op
+      }
+      desktopHostSocket = null;
+    }
+
     if (serverHandle && typeof serverHandle.close === "function") {
       await serverHandle.close();
       serverHandle = null;

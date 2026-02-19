@@ -1,6 +1,6 @@
 {
   "name": "air-controller",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Use a phone as a game controller for another device over local network",
   "main": "server.js",
   "scripts": {
