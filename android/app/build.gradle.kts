@@ -4,6 +4,26 @@ plugins {
     alias(libs.plugins.kotlin.compose)
 }
 
+val releaseStoreFile = providers.environmentVariable("ANDROID_SIGNING_STORE_FILE").orNull
+val releaseStorePassword = providers.environmentVariable("ANDROID_SIGNING_STORE_PASSWORD").orNull
+val releaseKeyAlias = providers.environmentVariable("ANDROID_SIGNING_KEY_ALIAS").orNull
+val releaseKeyPassword = providers.environmentVariable("ANDROID_SIGNING_KEY_PASSWORD").orNull
+val hasReleaseSigning =
+    !releaseStoreFile.isNullOrBlank() &&
+        !releaseStorePassword.isNullOrBlank() &&
+        !releaseKeyAlias.isNullOrBlank() &&
+        !releaseKeyPassword.isNullOrBlank()
+
+val requireReleaseSigning = providers.gradleProperty("requireReleaseSigning").orNull == "true"
+
+if (requireReleaseSigning && !hasReleaseSigning) {
+    throw GradleException(
+        "Release signing is required but Android signing env vars are missing. " +
+            "Set ANDROID_SIGNING_STORE_FILE, ANDROID_SIGNING_STORE_PASSWORD, " +
+            "ANDROID_SIGNING_KEY_ALIAS, ANDROID_SIGNING_KEY_PASSWORD."
+    )
+}
+
 android {
     namespace = "com.aircontroller"
     compileSdk = 35
@@ -16,9 +36,25 @@ android {
         versionName = "1.0"
     }
 
+    signingConfigs {
+        if (hasReleaseSigning) {
+            create("release") {
+                storeFile = file(releaseStoreFile!!)
+                storePassword = releaseStorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = if (hasReleaseSigning) {
+                signingConfigs.getByName("release")
+            } else {
+                signingConfigs.getByName("debug")
+            }
         }
     }
 

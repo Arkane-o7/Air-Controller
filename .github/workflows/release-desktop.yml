@@ -1,0 +1,70 @@
+name: Release Desktop
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_windows:
+        description: Build Windows installer
+        required: true
+        default: true
+        type: boolean
+      require_vigem_installer:
+        description: Require ViGEm installer for strict preflight
+        required: true
+        default: false
+        type: boolean
+      vigem_installer_url:
+        description: Optional URL for ViGEmBus_Setup_x64.exe
+        required: false
+        default: ''
+        type: string
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  desktop-windows:
+    if: ${{ github.event_name == 'push' || inputs.build_windows }}
+    runs-on: windows-latest
+
+    env:
+      REQUIRE_VIGEM_INSTALLER: ${{ github.event_name == 'push' && '1' || (inputs.require_vigem_installer && '1' || '0') }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Download ViGEm installer (optional override)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.vigem_installer_url != '' }}
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Path desktop/build/prereqs -Force | Out-Null
+          Invoke-WebRequest -Uri "${{ inputs.vigem_installer_url }}" -OutFile "desktop/build/prereqs/ViGEmBus_Setup_x64.exe"
+
+      - name: Install dependencies
+        working-directory: desktop
+        run: npm ci
+
+      - name: Run release verification
+        working-directory: desktop
+        run: npm run release:verify
+
+      - name: Build Windows installer
+        working-directory: desktop
+        run: npm run release:win
+
+      - name: Publish desktop artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-windows-${{ github.ref_name }}
+          path: |
+            desktop/dist/*setup.exe
+            desktop/dist/win-unpacked/**
+          if-no-files-found: error

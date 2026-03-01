@@ -11,6 +11,11 @@
     "start": "electron-vite preview",
     "dev": "electron-vite dev",
     "build": "electron-vite build",
+    "release:preflight": "node ./scripts/release-preflight.mjs",
+    "release:verify": "npm run release:preflight && npm run typecheck && npm run lint && npm run build",
+    "release:win": "npm run release:verify && electron-builder --win --x64 --publish never",
+    "release:mac": "npm run release:verify && electron-builder --mac --publish never",
+    "release:linux": "npm run release:verify && electron-builder --linux --publish never",
     "postinstall": "electron-builder install-app-deps",
     "build:unpack": "npm run build && electron-builder --dir --x64",
     "build:win": "npm run build && electron-builder --win --x64",
@@ -27,6 +32,7 @@
     "vigemclient": "^1.2.0"
   },
   "devDependencies": {
+    "@babel/core": "^7.29.0",
     "@electron-toolkit/eslint-config": "^2.1.0",
     "@electron-toolkit/eslint-config-prettier": "^3.0.0",
     "@electron-toolkit/tsconfig": "^1.0.1",
@@ -36,6 +42,7 @@
     "@types/react-dom": "^18.3.1",
     "@types/ws": "^8.5.13",
     "@vitejs/plugin-react": "^4.3.4",
+    "7zip-bin": "^5.2.0",
     "electron": "^39.2.6",
     "electron-builder": "^26.0.12",
     "electron-vite": "^5.0.0",
