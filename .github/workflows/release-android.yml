@@ -2,9 +2,6 @@ name: Release Android
 
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - 'v*'
   workflow_call:
     secrets:
       ANDROID_KEYSTORE_BASE64:

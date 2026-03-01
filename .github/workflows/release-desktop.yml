@@ -18,17 +18,28 @@ on:
         required: false
         default: ''
         type: string
-  push:
-    tags:
-      - 'v*'
+  workflow_call:
+    inputs:
+      build_windows:
+        required: false
+        type: boolean
+        default: true
+      require_vigem_installer:
+        required: false
+        type: boolean
+        default: false
+      vigem_installer_url:
+        required: false
+        type: string
+        default: ''
 
 jobs:
   desktop-windows:
-    if: ${{ github.event_name == 'push' || inputs.build_windows }}
+    if: ${{ inputs.build_windows }}
     runs-on: windows-latest
 
     env:
-      REQUIRE_VIGEM_INSTALLER: ${{ github.event_name == 'push' && '1' || (inputs.require_vigem_installer && '1' || '0') }}
+      REQUIRE_VIGEM_INSTALLER: ${{ inputs.require_vigem_installer && '1' || '0' }}
 
     steps:
       - name: Checkout
@@ -42,7 +53,7 @@ jobs:
           cache-dependency-path: desktop/package-lock.json
 
       - name: Download ViGEm installer (optional override)
-        if: ${{ github.event_name == 'workflow_dispatch' && inputs.vigem_installer_url != '' }}
+        if: ${{ inputs.vigem_installer_url != '' }}
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path desktop/build/prereqs -Force | Out-Null

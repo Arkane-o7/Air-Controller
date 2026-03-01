@@ -11,7 +11,7 @@ This runbook describes everything required to ship production artifacts for desk
 3. Create release tag:
    - `v<version>` (example: `v1.0.0`)
 
-Tag pushes automatically trigger release workflows.
+Tag pushes automatically trigger the GitHub Release publish workflow.
 
 ## 2) Desktop release prerequisites (Windows)
 
@@ -106,14 +106,23 @@ Website APK artifact:
 
 ## 5) GitHub Actions workflows
 
+- `.github/workflows/release-github.yml`
+  - Trigger: `push` on `v*` tags.
+  - Calls desktop + Android reusable workflows.
+  - Publishes downloadable assets to the GitHub Release page:
+    - Windows setup `.exe`
+    - Android `.apk`
+    - Android `.aab`
 - `.github/workflows/release-desktop.yml`
+  - Reusable/manual desktop build workflow.
   - Builds and uploads Windows setup/unpacked artifacts.
   - Enforces desktop preflight checks.
 - `.github/workflows/release-android.yml`
+  - Reusable/manual Android signed build workflow.
   - Builds signed Android release APK + AAB.
   - Fails fast if signing secrets are missing.
 - `.github/workflows/release-android-website.yml`
-  - Builds APK for website sideload distribution.
+  - Manual/reusable APK workflow for website sideload distribution.
   - No Play developer account or GitHub signing secrets required.
 
 ## 6) Final QA checklist
