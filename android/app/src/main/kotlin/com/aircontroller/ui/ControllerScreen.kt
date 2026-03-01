@@ -57,12 +57,12 @@ fun ControllerScreen(
                             .padding(horizontal = 24.dp),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        TriggerSlider(label = "LT") { v ->
+                        TriggerSlider(label = "LT", onValueChanged = { v ->
                             wsClient?.let { viewModel.sendTrigger(it, "left", v) }
-                        }
-                        TriggerSlider(label = "RT") { v ->
+                        })
+                        TriggerSlider(label = "RT", onValueChanged = { v ->
                             wsClient?.let { viewModel.sendTrigger(it, "right", v) }
-                        }
+                        })
                     }
                 }
 
@@ -75,18 +75,18 @@ fun ControllerScreen(
                 ) {
                     if (layout.showLeftStick) {
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                            Joystick { x, y ->
+                            Joystick(onMove = { x, y ->
                                 wsClient?.let { viewModel.sendStick(it, "left", x, y) }
-                            }
+                            })
                         }
                     } else {
                         Box(modifier = Modifier.weight(1f))
                     }
 
                     if (layout.showDpad) {
-                        DPad { direction ->
+                        DPad(onDirection = { direction ->
                             wsClient?.let { viewModel.sendDpad(it, direction) }
-                        }
+                        })
                     }
 
                     if (layout.showFaceButtons) {
@@ -124,9 +124,9 @@ fun ControllerScreen(
                     }
 
                     if (layout.showRightStick) {
-                        Joystick { x, y ->
+                        Joystick(onMove = { x, y ->
                             wsClient?.let { viewModel.sendStick(it, "right", x, y) }
-                        }
+                        })
                     }
                 }
             }
