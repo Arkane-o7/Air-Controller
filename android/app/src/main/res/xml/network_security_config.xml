@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<network-security-config>
+    <!-- Allow cleartext (HTTP / plain WebSocket) to any host.
+         AirController connects to the desktop server on the local network
+         using plain WebSocket (ws://) so HTTPS is not available. -->
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>
