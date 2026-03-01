@@ -66,10 +66,61 @@ var modeGyroscope = false;
 
 // Global Variable
 var latency = null;
+var controllerStatus = {
+    ready: false,
+    slot: null,
+    maxControllers: null
+};
+
+function setControllerStatus(text, isError = false)
+{
+    var statusText = document.getElementById("controller-status-text");
+    if(!statusText) return;
+
+    statusText.innerText = text;
+    statusText.style.color = isError ? "#ff7d7d" : "#9ff2a4";
+}
 
 function openSocketIO()
 {
     this.socket = io();
+
+    this.socket.on('connect', function(){
+        controllerStatus.ready = false;
+        controllerStatus.slot = null;
+        setControllerStatus("Connected to server, waiting for slot...");
+    });
+
+    this.socket.on('disconnect', function(){
+        controllerStatus.ready = false;
+        controllerStatus.slot = null;
+        setControllerStatus("Disconnected from server.", true);
+    });
+
+    this.socket.on('controller_status', function(data){
+        if(!data || !data.state) return;
+
+        switch(data.state)
+        {
+            case 'assigned':
+                controllerStatus.ready = true;
+                controllerStatus.slot = data.slot || null;
+                controllerStatus.maxControllers = data.maxControllers || null;
+                setControllerStatus(`Connected as Player ${controllerStatus.slot}.`);
+                break;
+            case 'full':
+                controllerStatus.ready = false;
+                controllerStatus.slot = null;
+                controllerStatus.maxControllers = data.maxControllers || null;
+                setControllerStatus(data.message || "Server is full.", true);
+                break;
+            case 'error':
+                controllerStatus.ready = false;
+                controllerStatus.slot = null;
+                setControllerStatus(data.message || "Controller initialization failed.", true);
+                break;
+        }
+    });
 
     this.socket.on('message', function(data){
         // console.log(data);  
@@ -77,12 +128,19 @@ function openSocketIO()
 
     this.send = function(data)
     {
+        if(!controllerStatus.ready) return;
         this.socket.emit('message', data);
         // console.log(data);  
     }
 
     this.ping = function()
     {
+        if(!controllerStatus.ready)
+        {
+            document.getElementById("ping-latency").innerText = "Not assigned to a controller slot";
+            return;
+        }
+
         var start = Date.now();
         this.socket.emit('latency', "ping", function(){
             var delta = Date.now() - start;

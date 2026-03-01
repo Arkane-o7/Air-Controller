@@ -55,6 +55,8 @@ class server {
     setVariables()
     {
         this._controllers = {};
+        this._controllerSlots = {};
+        this._maxControllers = parseInt(process.env.MAX_CONTROLLERS || "4", 10);
         this._app = express();
         this._https = require('https').createServer(cred, this._app);
         this._socket = require('socket.io')(this._https);
@@ -76,6 +78,19 @@ class server {
     createSocket()
     {
         this._socket.on('connection', (socket) => {
+            const slot = this.allocateSlot(socket.id);
+
+            if(slot === null)
+            {
+                socket.emit('controller_status', {
+                    state: 'full',
+                    maxControllers: this._maxControllers,
+                    message: `Controller limit reached (${this._maxControllers}).`
+                });
+                socket.disconnect(true);
+                return;
+            }
+
             // Notification Callback
             let notificationCallback = function(data)
             {
@@ -88,9 +103,22 @@ class server {
 
             if(this._controllers[socket.id] !== false)
             {
+                socket.emit('controller_status', {
+                    state: 'assigned',
+                    slot: slot,
+                    activeControllers: this.activeControllerCount(),
+                    maxControllers: this._maxControllers,
+                    message: `Connected as Player ${slot}.`
+                });
+
                 socket.on('disconnect', () => {
                     console.log('user disconnected');
-                    client.disconnectController();
+                    if(client)
+                    {
+                        client.disconnectController();
+                    }
+
+                    this.releaseSlot(socket.id);
                 });
 
                 socket.on('latency', function(msg, callback){
@@ -123,8 +151,45 @@ class server {
                             break;
                     }
                 });
+            } else {
+                this.releaseSlot(socket.id);
+                socket.emit('controller_status', {
+                    state: 'error',
+                    message: 'Failed to initialize virtual controller.'
+                });
+                socket.disconnect(true);
             }
         });
+    }
+
+    allocateSlot(socketId)
+    {
+        if(this.activeControllerCount() >= this._maxControllers)
+        {
+            return null;
+        }
+
+        for(let i = 1; i <= this._maxControllers; i++)
+        {
+            if(!Object.values(this._controllerSlots).includes(i))
+            {
+                this._controllerSlots[socketId] = i;
+                return i;
+            }
+        }
+
+        return null;
+    }
+
+    releaseSlot(socketId)
+    {
+        delete this._controllers[socketId];
+        delete this._controllerSlots[socketId];
+    }
+
+    activeControllerCount()
+    {
+        return Object.keys(this._controllerSlots).length;
     }
 
     getLocalIP()
@@ -140,6 +205,7 @@ class server {
         this._https.listen(this._port, () => {
             console.log(`Open this link on your phone :`);
             console.log(`https://${this._local}:${this._port}`);
+            console.log(`Max controllers: ${this._maxControllers}`);
         });
     }
 }
