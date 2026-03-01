@@ -108,11 +108,10 @@ Website APK artifact:
 
 - `.github/workflows/release-github.yml`
   - Trigger: `push` on `v*` tags.
-  - Calls desktop + Android reusable workflows.
+  - Calls desktop + Android website-APK reusable workflows.
   - Publishes downloadable assets to the GitHub Release page:
     - Windows setup `.exe`
     - Android `.apk`
-    - Android `.aab`
 - `.github/workflows/release-desktop.yml`
   - Reusable/manual desktop build workflow.
   - Builds and uploads Windows setup/unpacked artifacts.

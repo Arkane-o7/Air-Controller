@@ -20,8 +20,7 @@ jobs:
       require_vigem_installer: true
 
   build-android:
-    uses: ./.github/workflows/release-android.yml
-    secrets: inherit
+    uses: ./.github/workflows/release-android-website.yml
 
   publish-release:
     name: Publish release assets
@@ -47,4 +46,3 @@ jobs:
           files: |
             release-assets/**/*setup.exe
             release-assets/**/*.apk
-            release-assets/**/*.aab
