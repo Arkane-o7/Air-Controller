@@ -378,13 +378,50 @@ function generateCode(): string {
 
 function getBestLanIp(): string {
   const ifaces = networkInterfaces()
-  for (const entries of Object.values(ifaces)) {
+
+  // Patterns that indicate virtual / non-physical adapters (case-insensitive)
+  const virtualPatterns =
+    /^(vEthernet|veth|Hyper-V|WSL|docker|br-|vmnet|vmware|VirtualBox|virbr|tailscale|tun|tap|utun|ham|npcap|loopback)/i
+
+  // Subnet ranges commonly used by virtual adapters (Windows Mobile Hotspot, etc.)
+  const virtualSubnets = ['192.168.137.', '172.17.', '172.18.', '172.19.']
+
+  interface Candidate {
+    address: string
+    score: number
+  }
+
+  const candidates: Candidate[] = []
+
+  for (const [name, entries] of Object.entries(ifaces)) {
     if (!entries) continue
     for (const entry of entries) {
-      if (entry.family === 'IPv4' && !entry.internal) {
-        return entry.address
+      if (entry.family !== 'IPv4' || entry.internal) continue
+
+      let score = 0
+
+      // Prefer real adapter names (Wi-Fi, Ethernet, en0, wlan0, eth0)
+      if (/^(Wi-?Fi|Ethernet|en\d|wlan\d|eth\d)/i.test(name)) {
+        score += 100
       }
+
+      // Penalise virtual adapters
+      if (virtualPatterns.test(name)) {
+        score -= 200
+      }
+
+      // Penalise virtual subnets
+      if (virtualSubnets.some((s) => entry.address.startsWith(s))) {
+        score -= 150
+      }
+
+      candidates.push({ address: entry.address, score })
     }
   }
-  return '127.0.0.1'
+
+  if (candidates.length === 0) return '127.0.0.1'
+
+  // Sort descending by score; first entry wins
+  candidates.sort((a, b) => b.score - a.score)
+  return candidates[0].address
 }
