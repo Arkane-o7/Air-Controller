@@ -2,15 +2,24 @@
   "name": "virtual-gamepad",
   "version": "0.1.0",
   "description": "An application to transform a phone into a controller",
-  "main": "start.js",
+  "main": "electron/main.js",
   "scripts": {
-    "start": "node start.js"
+    "start": "node start.js",
+    "electron": "electron electron/main.js",
+    "electron:dev": "electron electron/main.js",
+    "prepare:vigem": "node electron/scripts/prepare-vigem-installer.js",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "dist:win": "npm run prepare:vigem && electron-builder --win nsis portable",
+    "android:apk:debug": "node electron/scripts/build-android.js debug",
+    "android:apk:release": "node electron/scripts/build-android.js release"
   },
   "author": "FahrulID",
   "license": "MIT",
   "dependencies": {
     "dree": "^3.3.0",
     "express": "^4.17.1",
+    "qrcode": "^1.5.4",
     "screenshot-desktop": "^1.12.3",
     "socket.io": "^3.0.3",
     "vigemclient": "^1.1.2"
@@ -29,6 +38,52 @@
     ]
   },
   "devDependencies": {
-    "electron": "^16.0.7"
+    "electron": "^16.0.7",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.arkane.aircontroller",
+    "productName": "AirController",
+    "npmRebuild": false,
+    "nodeGypRebuild": false,
+    "directories": {
+      "output": "../../build/electron"
+    },
+    "extraResources": [
+      {
+        "from": "electron/resources/vigem",
+        "to": "vigem",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "files": [
+      "electron/**/*",
+      "start.js",
+      "app.controller.js",
+      "app.feeder.js",
+      "screenshot.js",
+      "static/**/*",
+      "ssl/**/*",
+      "package.json"
+    ],
+    "asarUnpack": [
+      "node_modules/vigemclient/**"
+    ],
+    "win": {
+      "target": [
+        "nsis",
+        "portable"
+      ],
+      "artifactName": "AirController-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "include": "electron/installer/after-install.nsh"
+    }
   }
 }

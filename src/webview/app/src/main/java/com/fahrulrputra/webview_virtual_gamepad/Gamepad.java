@@ -5,6 +5,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import android.content.pm.ActivityInfo;
 import android.net.http.SslError;
 import android.os.Bundle;
+import android.widget.Toast;
 import android.webkit.SslErrorHandler;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -39,7 +40,12 @@ public class Gamepad extends AppCompatActivity {
                 }
                 message += "\"SSL Certificate Error\" Do you want to continue anyway?.. YES";
 
-                handler.proceed();
+                if (BuildConfig.DEBUG) {
+                    handler.proceed();
+                } else {
+                    handler.cancel();
+                    Toast.makeText(Gamepad.this, "Secure connection failed: " + message, Toast.LENGTH_LONG).show();
+                }
             }
 
         });

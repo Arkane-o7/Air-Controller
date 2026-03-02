@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AirController</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar card">
+        <div class="brand-row">
+          <div class="logo-badge">⚡</div>
+          <div>
+            <h1 class="brand">AIRCONTROLLER</h1>
+          </div>
+        </div>
+
+        <nav class="nav-links">
+          <button class="nav-link active">Dashboard</button>
+          <button class="nav-link">Controller Layouts</button>
+          <button class="nav-link">Settings</button>
+        </nav>
+      </aside>
+
+      <main class="content">
+        <header class="topbar">
+          <div>
+            <h2>System Overview</h2>
+            <p>Manage connections and paired devices.</p>
+          </div>
+          <div class="ip-chip" id="ipChip">Detecting IP...</div>
+        </header>
+
+        <section class="grid">
+          <article class="card pair-card">
+            <div class="card-head">
+              <h3>Instant Pair</h3>
+              <button class="icon-btn" id="refreshCodeBtn" title="Refresh pair code">↻</button>
+            </div>
+            <p class="muted">Scan with any smartphone camera</p>
+
+            <div class="qr-wrap">
+              <canvas id="qrCanvas" width="220" height="220"></canvas>
+            </div>
+
+            <div class="pair-meta">
+              <div class="pair-row">
+                <span>Join URL</span>
+                <code id="joinUrl">https://127.0.0.1:7200</code>
+              </div>
+              <div class="pair-row">
+                <span>6-digit code</span>
+                <code id="pairCode">------</code>
+              </div>
+            </div>
+          </article>
+
+          <article class="card controllers-card">
+            <div class="card-head">
+              <h3>Server Control</h3>
+              <span class="status-pill" id="statusPill">Stopped</span>
+            </div>
+
+            <div class="controls">
+              <button class="primary" id="serverToggleBtn">Start Server</button>
+              <button class="ghost" id="copyUrlBtn">Copy Join URL</button>
+            </div>
+
+            <div class="server-meta">
+              <p><strong>Server URL:</strong> <span id="serverUrl">https://127.0.0.1:7200</span></p>
+              <p><strong>State:</strong> <span id="serverStateText">stopped</span></p>
+            </div>
+
+            <div class="controllers-wrap">
+              <div class="log-head">
+                <strong>Connected Controllers</strong>
+                <span class="count-pill" id="controllerCount">0 active</span>
+              </div>
+              <div id="controllersList" class="controllers-list">
+                <div class="controller-empty">Waiting for players...</div>
+              </div>
+            </div>
+
+            <div class="log-wrap">
+              <div class="log-head">
+                <strong>Runtime Logs</strong>
+                <button class="ghost mini" id="clearLogsBtn">Clear</button>
+              </div>
+              <pre id="logPanel" class="logs">[aircontroller] GUI ready.</pre>
+            </div>
+          </article>
+        </section>
+      </main>
+    </div>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

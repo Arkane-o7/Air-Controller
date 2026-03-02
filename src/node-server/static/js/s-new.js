@@ -69,8 +69,15 @@ var latency = null;
 var controllerStatus = {
     ready: false,
     slot: null,
-    maxControllers: null
+    maxControllers: null,
+    paired: false
 };
+
+function getPairCodeFromQuery()
+{
+    var params = new URLSearchParams(window.location.search);
+    return (params.get('pair') || '').trim();
+}
 
 function setControllerStatus(text, isError = false)
 {
@@ -85,15 +92,22 @@ function openSocketIO()
 {
     this.socket = io();
 
+    this.pair = function(code)
+    {
+        this.socket.emit('pair', { code: code });
+    }
+
     this.socket.on('connect', function(){
         controllerStatus.ready = false;
         controllerStatus.slot = null;
+        controllerStatus.paired = false;
         setControllerStatus("Connected to server, waiting for slot...");
     });
 
     this.socket.on('disconnect', function(){
         controllerStatus.ready = false;
         controllerStatus.slot = null;
+        controllerStatus.paired = false;
         setControllerStatus("Disconnected from server.", true);
     });
 
@@ -102,8 +116,31 @@ function openSocketIO()
 
         switch(data.state)
         {
+            case 'pair_required':
+                controllerStatus.ready = false;
+                controllerStatus.paired = false;
+
+                var pairCode = getPairCodeFromQuery();
+                if(pairCode)
+                {
+                    setControllerStatus("Pairing in progress...");
+                    socket.pair(pairCode);
+                } else {
+                    setControllerStatus("Pairing code missing in URL.", true);
+                }
+                break;
+            case 'pair_ok':
+                controllerStatus.paired = true;
+                setControllerStatus(data.message || "Pairing successful. Waiting for slot...");
+                break;
+            case 'pair_invalid':
+                controllerStatus.ready = false;
+                controllerStatus.paired = false;
+                setControllerStatus(data.message || "Invalid pairing code.", true);
+                break;
             case 'assigned':
                 controllerStatus.ready = true;
+                controllerStatus.paired = true;
                 controllerStatus.slot = data.slot || null;
                 controllerStatus.maxControllers = data.maxControllers || null;
                 setControllerStatus(`Connected as Player ${controllerStatus.slot}.`);

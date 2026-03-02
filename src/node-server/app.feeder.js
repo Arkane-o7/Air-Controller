@@ -184,6 +184,11 @@ class feeder
 
     normalize(value, max)
     {
+        if(!Number.isFinite(max) || max === 0)
+        {
+            return 0;
+        }
+
         return value/max;
     }
 

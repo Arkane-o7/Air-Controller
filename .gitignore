@@ -1,0 +1,8 @@
+# Build artifacts
+/build/
+
+# Local release staging
+/src/node-server/release-assets/
+
+# OS/editor noise
+.DS_Store
